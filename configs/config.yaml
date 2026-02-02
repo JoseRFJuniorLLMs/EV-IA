@@ -39,7 +39,7 @@ database:
   log_queries: false # Enable in development only
 
 redis:
-  url: redis://localhost:6379/0
+  url: redis://:Debian23@localhost:6379/0
   max_retries: 3
   pool_size: 100
   min_idle_conns: 10
