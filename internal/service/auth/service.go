@@ -117,7 +117,7 @@ func (s *Service) ValidateToken(ctx context.Context, tokenStr string) (*domain.U
 }
 
 func (s *Service) generateTokens(user *domain.User) (string, string, error) {
-	accessToken, err := s.generateAccessToken(user)
+	accessTokenStr, err := s.generateAccessToken(user)
 	if err != nil {
 		return "", "", err
 	}
