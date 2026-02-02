@@ -388,3 +388,30 @@ type Alert struct {
 	Acknowledged bool      `json:"acknowledged"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+// TravelService handles trip planning and travel integrations
+type TravelService interface {
+	// PlanTrip creates a comprehensive trip plan
+	PlanTrip(ctx context.Context, req *domain.TripPlanRequest) (*domain.Trip, error)
+
+	// GetTrip retrieves a trip by ID
+	GetTrip(ctx context.Context, id string) (*domain.Trip, error)
+
+	// GetUserTrips retrieves all trips for a user
+	GetUserTrips(ctx context.Context, userID string, status string, limit, offset int) ([]domain.Trip, error)
+
+	// UpdateTrip updates a trip
+	UpdateTrip(ctx context.Context, trip *domain.Trip) error
+
+	// DeleteTrip deletes a trip
+	DeleteTrip(ctx context.Context, id string) error
+
+	// GetTripEstimate returns cost and time estimates for a trip
+	GetTripEstimate(ctx context.Context, req *domain.TripPlanRequest) (*domain.TripEstimate, error)
+
+	// SearchFlights searches for flights
+	SearchFlights(ctx context.Context, req *domain.FlightSearchRequest) ([]domain.Flight, error)
+
+	// SearchAccommodations searches for accommodations
+	SearchAccommodations(ctx context.Context, req *domain.AccommodationSearchRequest) ([]domain.Accommodation, error)
+}
