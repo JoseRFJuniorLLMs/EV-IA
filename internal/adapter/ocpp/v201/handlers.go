@@ -140,7 +140,7 @@ func (s *Server) handleTransactionEvent(cpID string, payload []byte) (*Transacti
 
 	case "Updated":
 		// Handle meter values update during charging
-		if req.TransactionInfo != nil && req.MeterValue != nil {
+		if req.TransactionInfo.TransactionId != "" && len(req.MeterValue) > 0 {
 			s.log.Info("Transaction Updated - Meter Values",
 				zap.String("txID", req.TransactionInfo.TransactionId),
 				zap.Any("meterValues", req.MeterValue),

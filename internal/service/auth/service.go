@@ -89,12 +89,6 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (string
 	}
 
 	// Generate new access token
-	accessToken, _, err := s.generateTokens(user) // Only assume we return access token here for simplicity or re-gen both
-	// But generateTokens returns both. Let's just return access token as requested.
-	// Actually typical flow might rotate refresh token too.
-	// For this implementations, I'll allow re-using refresh token logic inside generateTokens but discard refresh?
-	// Or better:
-
 	accessTokenStr, err := s.generateAccessToken(user)
 	return accessTokenStr, err
 }
