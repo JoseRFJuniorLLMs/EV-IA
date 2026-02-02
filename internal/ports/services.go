@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/seu-repo/sigec-ve/internal/domain"
 )
