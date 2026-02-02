@@ -67,13 +67,94 @@ func (r *ChargePointRepository) UpdateStatus(ctx context.Context, id string, sta
 
 func (r *ChargePointRepository) FindNearby(ctx context.Context, lat, lon, radius float64) ([]domain.ChargePoint, error) {
 	var cps []domain.ChargePoint
-	// This requires PostGIS or complex SQL. For now, simple implementation or mock.
-	// Assuming simple bounding box or mocked for this template.
-	// Implementing Haversine formula directly in SQL is possible but verbose.
-	// For "enterprise" MVP, let's just return all or a limit for now,
-	// or implement a basic SQL distance check if lat/key exist.
 
-	// Placeholder implementation: Return all (filtering by radius would go here)
-	result := r.db.WithContext(ctx).Preload("Connectors").Preload("Location").Limit(10).Find(&cps)
-	return cps, result.Error
+	// Haversine formula in SQL for calculating distance between two points
+	// Returns distance in kilometers
+	// Earth radius: 6371 km
+	//
+	// Formula:
+	// distance = 2 * R * asin(sqrt(
+	//   sin²((lat2-lat1)/2) + cos(lat1) * cos(lat2) * sin²((lon2-lon1)/2)
+	// ))
+	haversineSQL := `
+		SELECT cp.* FROM charge_points cp
+		INNER JOIN locations l ON l.id = cp.location_id
+		WHERE l.latitude IS NOT NULL
+		  AND l.longitude IS NOT NULL
+		  AND (
+			6371 * 2 * ASIN(SQRT(
+				POWER(SIN(RADIANS(l.latitude - ?) / 2), 2) +
+				COS(RADIANS(?)) * COS(RADIANS(l.latitude)) *
+				POWER(SIN(RADIANS(l.longitude - ?) / 2), 2)
+			))
+		  ) <= ?
+		ORDER BY (
+			6371 * 2 * ASIN(SQRT(
+				POWER(SIN(RADIANS(l.latitude - ?) / 2), 2) +
+				COS(RADIANS(?)) * COS(RADIANS(l.latitude)) *
+				POWER(SIN(RADIANS(l.longitude - ?) / 2), 2)
+			))
+		) ASC
+		LIMIT 50
+	`
+
+	// Execute raw SQL with Haversine formula
+	// Parameters: lat (3x for formula), lon (2x), radius, lat (2x for ORDER BY), lon
+	result := r.db.WithContext(ctx).Raw(
+		haversineSQL,
+		lat, lat, lon, radius, // WHERE clause
+		lat, lat, lon,         // ORDER BY clause
+	).Scan(&cps)
+
+	if result.Error != nil {
+		r.log.Error("Failed to find nearby charge points",
+			zap.Float64("lat", lat),
+			zap.Float64("lon", lon),
+			zap.Float64("radius_km", radius),
+			zap.Error(result.Error),
+		)
+		return nil, result.Error
+	}
+
+	// Preload relationships for each charge point found
+	if len(cps) > 0 {
+		ids := make([]string, len(cps))
+		for i, cp := range cps {
+			ids[i] = cp.ID
+		}
+
+		// Reload with preloaded relationships
+		var cpsWithRelations []domain.ChargePoint
+		if err := r.db.WithContext(ctx).
+			Preload("Connectors").
+			Preload("Location").
+			Where("id IN ?", ids).
+			Find(&cpsWithRelations).Error; err != nil {
+			r.log.Error("Failed to preload charge point relations", zap.Error(err))
+			return cps, nil // Return without relations rather than failing
+		}
+
+		// Maintain distance-based ordering
+		cpMap := make(map[string]domain.ChargePoint, len(cpsWithRelations))
+		for _, cp := range cpsWithRelations {
+			cpMap[cp.ID] = cp
+		}
+
+		orderedCps := make([]domain.ChargePoint, 0, len(cps))
+		for _, cp := range cps {
+			if fullCp, ok := cpMap[cp.ID]; ok {
+				orderedCps = append(orderedCps, fullCp)
+			}
+		}
+		cps = orderedCps
+	}
+
+	r.log.Debug("Found nearby charge points",
+		zap.Float64("lat", lat),
+		zap.Float64("lon", lon),
+		zap.Float64("radius_km", radius),
+		zap.Int("count", len(cps)),
+	)
+
+	return cps, nil
 }

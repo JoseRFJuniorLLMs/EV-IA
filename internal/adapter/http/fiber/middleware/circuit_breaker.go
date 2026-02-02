@@ -8,26 +8,66 @@ import (
 	"go.uber.org/zap"
 )
 
-// Global logger variable, assuming it is initialized elsewhere or should be passed.
-var logger *zap.Logger
+// CircuitBreakerConfig holds configuration for the circuit breaker middleware
+type CircuitBreakerConfig struct {
+	Logger      *zap.Logger
+	Name        string
+	MaxRequests uint32
+	Interval    time.Duration
+	Timeout     time.Duration
+}
 
-func CircuitBreaker() fiber.Handler {
-	cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+// DefaultCircuitBreakerConfig returns sensible defaults
+func DefaultCircuitBreakerConfig() CircuitBreakerConfig {
+	return CircuitBreakerConfig{
+		Logger:      zap.NewNop(), // Safe no-op logger as default
 		Name:        "sigec-api",
 		MaxRequests: 3,
 		Interval:    time.Minute,
 		Timeout:     30 * time.Second,
+	}
+}
+
+// CircuitBreaker creates a circuit breaker middleware with default config
+func CircuitBreaker() fiber.Handler {
+	return CircuitBreakerWithConfig(DefaultCircuitBreakerConfig())
+}
+
+// CircuitBreakerWithLogger creates a circuit breaker middleware with a specific logger
+func CircuitBreakerWithLogger(log *zap.Logger) fiber.Handler {
+	cfg := DefaultCircuitBreakerConfig()
+	if log != nil {
+		cfg.Logger = log
+	}
+	return CircuitBreakerWithConfig(cfg)
+}
+
+// CircuitBreakerWithConfig creates a circuit breaker middleware with custom config
+func CircuitBreakerWithConfig(cfg CircuitBreakerConfig) fiber.Handler {
+	// Ensure logger is never nil
+	log := cfg.Logger
+	if log == nil {
+		log = zap.NewNop()
+	}
+
+	cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+		Name:        cfg.Name,
+		MaxRequests: cfg.MaxRequests,
+		Interval:    cfg.Interval,
+		Timeout:     cfg.Timeout,
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			if counts.Requests == 0 {
+				return false
+			}
 			failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
 			return counts.Requests >= 3 && failureRatio >= 0.6
 		},
 		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
-			if logger != nil {
-				logger.Warn("Circuit breaker state changed",
-					zap.String("from", from.String()),
-					zap.String("to", to.String()),
-				)
-			}
+			log.Warn("Circuit breaker state changed",
+				zap.String("name", name),
+				zap.String("from", from.String()),
+				zap.String("to", to.String()),
+			)
 		},
 	})
 
@@ -37,6 +77,10 @@ func CircuitBreaker() fiber.Handler {
 		})
 
 		if err == gobreaker.ErrOpenState {
+			log.Warn("Circuit breaker open, rejecting request",
+				zap.String("path", c.Path()),
+				zap.String("method", c.Method()),
+			)
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"error": "Service temporarily unavailable",
 			})

@@ -27,6 +27,20 @@ func (s *Server) handleAction(chargePointID string, msgID string, action string,
 		responsePayload, err = s.handleStatusNotification(chargePointID, payload)
 	case "TransactionEvent":
 		responsePayload, err = s.handleTransactionEvent(chargePointID, payload)
+	case "MeterValues":
+		responsePayload, err = s.handleMeterValues(chargePointID, payload)
+	case "FirmwareStatusNotification":
+		responsePayload, err = s.handleFirmwareStatusNotification(chargePointID, payload)
+	case "LogStatusNotification":
+		responsePayload, err = s.handleLogStatusNotification(chargePointID, payload)
+	case "NotifyEVChargingNeeds":
+		responsePayload, err = s.handleNotifyEVChargingNeeds(chargePointID, payload)
+	case "NotifyEVChargingSchedule":
+		responsePayload, err = s.handleNotifyEVChargingSchedule(chargePointID, payload)
+	case "ReportChargingProfiles":
+		responsePayload, err = s.handleReportChargingProfiles(chargePointID, payload)
+	case "Authorize":
+		responsePayload, err = s.handleAuthorize(chargePointID, payload)
 	default:
 		s.sendError(chargePointID, msgID, "NotImplemented", fmt.Sprintf("Action %s not implemented", action), nil)
 		return
@@ -193,4 +207,166 @@ func (s *Server) sendError(id string, msgID string, code string, desc string, de
 	response := []interface{}{CallError, msgID, code, desc, details}
 	data, _ := json.Marshal(response)
 	s.Send(id, data)
+}
+
+// --- Additional Handlers ---
+
+// handleMeterValues processes meter values from the charge point
+func (s *Server) handleMeterValues(cpID string, payload []byte) (*MeterValuesResponse, error) {
+	var req MeterValuesRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
+	}
+
+	s.log.Info("Meter Values received",
+		zap.String("cpID", cpID),
+		zap.Int("evseId", req.EvseId),
+		zap.Int("meterValueCount", len(req.MeterValue)),
+	)
+
+	// Process meter values - in production, store these
+	for _, mv := range req.MeterValue {
+		for _, sv := range mv.SampledValue {
+			s.log.Debug("Meter sample",
+				zap.String("cpID", cpID),
+				zap.String("timestamp", mv.Timestamp),
+				zap.String("value", sv.Value),
+				zap.String("measurand", sv.Measurand),
+				zap.String("unit", sv.Unit),
+			)
+		}
+	}
+
+	return &MeterValuesResponse{}, nil
+}
+
+// handleFirmwareStatusNotification processes firmware update status
+func (s *Server) handleFirmwareStatusNotification(cpID string, payload []byte) (*FirmwareStatusNotificationResponse, error) {
+	var req FirmwareStatusNotificationRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
+	}
+
+	s.log.Info("Firmware Status Notification",
+		zap.String("cpID", cpID),
+		zap.String("status", req.Status),
+		zap.Intp("requestId", req.RequestId),
+	)
+
+	// TODO: Update firmware service with status
+	// Could publish to NATS for real-time updates
+
+	return &FirmwareStatusNotificationResponse{}, nil
+}
+
+// handleLogStatusNotification processes log upload status
+func (s *Server) handleLogStatusNotification(cpID string, payload []byte) (*LogStatusNotificationResponse, error) {
+	var req LogStatusNotificationRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
+	}
+
+	s.log.Info("Log Status Notification",
+		zap.String("cpID", cpID),
+		zap.String("status", req.Status),
+		zap.Intp("requestId", req.RequestId),
+	)
+
+	return &LogStatusNotificationResponse{}, nil
+}
+
+// handleNotifyEVChargingNeeds processes V2G charging needs from EV
+func (s *Server) handleNotifyEVChargingNeeds(cpID string, payload []byte) (*NotifyEVChargingNeedsResponse, error) {
+	var req NotifyEVChargingNeedsRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
+	}
+
+	s.log.Info("EV Charging Needs Notification (V2G)",
+		zap.String("cpID", cpID),
+		zap.Int("evseId", req.EvseId),
+		zap.String("energyTransfer", req.ChargingNeeds.RequestedEnergyTransfer),
+	)
+
+	// Check if this is a V2G capable EV (bidirectional)
+	isV2GCapable := req.ChargingNeeds.RequestedEnergyTransfer == "AC_BPT" ||
+		req.ChargingNeeds.RequestedEnergyTransfer == "DC_BPT"
+
+	if isV2GCapable && req.ChargingNeeds.DCChargingParameters != nil {
+		dc := req.ChargingNeeds.DCChargingParameters
+		s.log.Info("V2G Capable EV detected",
+			zap.String("cpID", cpID),
+			zap.Int("stateOfCharge", dc.StateOfCharge),
+			zap.Intp("evEnergyCapacity", dc.EVEnergyCapacity),
+			zap.Intp("evMaxDischargePower", dc.EVMaxDischargePower),
+		)
+
+		// TODO: Notify V2G service about available discharge capacity
+	}
+
+	return &NotifyEVChargingNeedsResponse{
+		Status: "Accepted",
+	}, nil
+}
+
+// handleNotifyEVChargingSchedule processes scheduled charging notification
+func (s *Server) handleNotifyEVChargingSchedule(cpID string, payload []byte) (*NotifyEVChargingScheduleResponse, error) {
+	var req NotifyEVChargingScheduleRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
+	}
+
+	s.log.Info("EV Charging Schedule Notification",
+		zap.String("cpID", cpID),
+		zap.Int("evseId", req.EvseId),
+		zap.String("timeBase", req.TimeBase),
+	)
+
+	return &NotifyEVChargingScheduleResponse{
+		Status: "Accepted",
+	}, nil
+}
+
+// handleReportChargingProfiles processes charging profiles report
+func (s *Server) handleReportChargingProfiles(cpID string, payload []byte) (*ReportChargingProfilesResponse, error) {
+	var req ReportChargingProfilesRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
+	}
+
+	s.log.Info("Charging Profiles Report",
+		zap.String("cpID", cpID),
+		zap.Int("requestId", req.RequestId),
+		zap.Int("evseId", req.EvseId),
+		zap.Int("profileCount", len(req.ChargingProfile)),
+		zap.Bool("toBeContinued", req.Tbc),
+	)
+
+	// TODO: Store reported profiles
+
+	return &ReportChargingProfilesResponse{}, nil
+}
+
+// handleAuthorize processes authorization requests
+func (s *Server) handleAuthorize(cpID string, payload []byte) (*AuthorizeResponse, error) {
+	var req struct {
+		IdToken IdToken `json:"idToken"`
+	}
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
+	}
+
+	s.log.Info("Authorization Request",
+		zap.String("cpID", cpID),
+		zap.String("idToken", req.IdToken.IdToken),
+		zap.String("type", req.IdToken.Type),
+	)
+
+	// TODO: Validate token against user service
+	// For now, accept all tokens
+	return &AuthorizeResponse{
+		IdTokenInfo: IdTokenInfo{
+			Status: "Accepted",
+		},
+	}, nil
 }

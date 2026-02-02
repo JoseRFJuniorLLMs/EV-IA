@@ -388,3 +388,208 @@ type Alert struct {
 	Acknowledged bool      `json:"acknowledged"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+// --- V2G (Vehicle-to-Grid) Services ---
+
+// V2GService handles Vehicle-to-Grid operations
+type V2GService interface {
+	// StartDischarge initiates V2G discharge from vehicle to grid
+	StartDischarge(ctx context.Context, req *V2GDischargeRequest) (*domain.V2GSession, error)
+
+	// StopDischarge stops an active V2G discharge session
+	StopDischarge(ctx context.Context, sessionID string) error
+
+	// GetActiveSession returns the active V2G session for a charge point
+	GetActiveSession(ctx context.Context, chargePointID string) (*domain.V2GSession, error)
+
+	// GetSession returns a V2G session by ID
+	GetSession(ctx context.Context, sessionID string) (*domain.V2GSession, error)
+
+	// CalculateCompensation calculates user compensation for V2G session
+	CalculateCompensation(ctx context.Context, session *domain.V2GSession) (*domain.V2GCompensation, error)
+
+	// CheckV2GCapability checks if vehicle at charge point supports V2G
+	CheckV2GCapability(ctx context.Context, chargePointID string) (*domain.V2GCapability, error)
+
+	// SetUserPreferences sets V2G preferences for a user
+	SetUserPreferences(ctx context.Context, userID string, prefs *domain.V2GPreferences) error
+
+	// GetUserPreferences gets V2G preferences for a user
+	GetUserPreferences(ctx context.Context, userID string) (*domain.V2GPreferences, error)
+
+	// OptimizeV2G automatically optimizes V2G based on preferences and grid prices
+	OptimizeV2G(ctx context.Context, chargePointID string, userID string) error
+
+	// GetUserStats returns V2G statistics for a user
+	GetUserStats(ctx context.Context, userID string, startDate, endDate time.Time) (*domain.V2GStats, error)
+}
+
+// V2GDischargeRequest represents a request to start V2G discharge
+type V2GDischargeRequest struct {
+	ChargePointID string     `json:"charge_point_id"`
+	ConnectorID   int        `json:"connector_id"`
+	UserID        string     `json:"user_id"`
+	MaxPowerKW    float64    `json:"max_power_kw"`
+	MaxEnergyKWh  float64    `json:"max_energy_kwh"`
+	MinBatterySOC int        `json:"min_battery_soc"`
+	EndTime       *time.Time `json:"end_time,omitempty"`
+}
+
+// GridPriceService handles grid electricity pricing
+type GridPriceService interface {
+	// GetCurrentPrice returns the current grid price in R$/kWh
+	GetCurrentPrice(ctx context.Context) (float64, error)
+
+	// GetPriceForecast returns price forecast for the next N hours
+	GetPriceForecast(ctx context.Context, hours int) ([]domain.GridPricePoint, error)
+
+	// IsPeakHour checks if current time is during peak hours
+	IsPeakHour(ctx context.Context) (bool, error)
+
+	// CalculateV2GCompensation calculates compensation for V2G discharge
+	CalculateV2GCompensation(ctx context.Context, energyKWh float64, startTime, endTime time.Time) (float64, error)
+}
+
+// V2GRepository handles V2G data persistence
+type V2GRepository interface {
+	// Session operations
+	CreateSession(ctx context.Context, session *domain.V2GSession) error
+	UpdateSession(ctx context.Context, session *domain.V2GSession) error
+	GetSession(ctx context.Context, sessionID string) (*domain.V2GSession, error)
+	GetSessionsByChargePoint(ctx context.Context, chargePointID string, limit int) ([]domain.V2GSession, error)
+	GetSessionsByUser(ctx context.Context, userID string, limit int) ([]domain.V2GSession, error)
+
+	// Preferences operations
+	SavePreferences(ctx context.Context, prefs *domain.V2GPreferences) error
+	GetPreferences(ctx context.Context, userID string) (*domain.V2GPreferences, error)
+
+	// Statistics
+	GetUserStats(ctx context.Context, userID string, startDate, endDate time.Time) (*domain.V2GStats, error)
+	GetChargePointStats(ctx context.Context, chargePointID string, startDate, endDate time.Time) (*domain.V2GStats, error)
+}
+
+// --- OCPP Command Service ---
+
+// OCPPCommandService provides OCPP commands from CSMS to charge points
+type OCPPCommandService interface {
+	// RemoteStartTransaction requests charge point to start a transaction
+	RemoteStartTransaction(ctx context.Context, chargePointID, idToken string, evseID *int) error
+
+	// RemoteStopTransaction requests charge point to stop a transaction
+	RemoteStopTransaction(ctx context.Context, chargePointID, transactionID string) error
+
+	// Reset requests charge point to reset
+	Reset(ctx context.Context, chargePointID string, resetType string, evseID *int) error
+
+	// TriggerMessage requests charge point to send a specific message
+	TriggerMessage(ctx context.Context, chargePointID, requestedMessage string, evseID *int) error
+
+	// SetChargingProfile sets a charging profile on an EVSE
+	SetChargingProfile(ctx context.Context, chargePointID string, evseID int, profile interface{}) error
+
+	// ClearChargingProfile clears charging profile(s) from charge point
+	ClearChargingProfile(ctx context.Context, chargePointID string, profileID *int, evseID *int) error
+
+	// UpdateFirmware requests charge point to update firmware
+	UpdateFirmware(ctx context.Context, chargePointID, firmwareURL, retrieveDateTime string, installDateTime *time.Time, retries, retryInterval *int) error
+
+	// UpdateFirmwareSigned requests signed firmware update
+	UpdateFirmwareSigned(ctx context.Context, chargePointID, firmwareURL, retrieveDateTime, signingCert, signature string, retries, retryInterval *int) error
+
+	// UnlockConnector requests to unlock a connector
+	UnlockConnector(ctx context.Context, chargePointID string, evseID, connectorID int) error
+
+	// ChangeAvailability changes charge point/EVSE availability
+	ChangeAvailability(ctx context.Context, chargePointID string, operationalStatus string, evseID *int) error
+
+	// GetVariables retrieves variable values from charge point
+	GetVariables(ctx context.Context, chargePointID string, variables []GetVariableRequest) ([]GetVariableResponse, error)
+
+	// SetVariables sets variable values on charge point
+	SetVariables(ctx context.Context, chargePointID string, variables []SetVariableRequest) error
+
+	// GetLog requests diagnostic logs from charge point
+	GetLog(ctx context.Context, chargePointID, logType, uploadURL string) error
+
+	// V2G specific commands
+	SetV2GChargingProfile(ctx context.Context, chargePointID string, evseID int, dischargePowerKW float64, durationSeconds int) error
+	ClearV2GChargingProfile(ctx context.Context, chargePointID string, evseID int) error
+	GetV2GCapability(ctx context.Context, chargePointID string) (*domain.V2GCapability, error)
+
+	// Connection status
+	IsConnected(chargePointID string) bool
+	GetConnectedClients() []string
+}
+
+// GetVariableRequest for OCPP GetVariables
+type GetVariableRequest struct {
+	ComponentName string
+	VariableName  string
+	Instance      string
+}
+
+// GetVariableResponse for OCPP GetVariables response
+type GetVariableResponse struct {
+	ComponentName string
+	VariableName  string
+	Value         string
+	Status        string
+}
+
+// SetVariableRequest for OCPP SetVariables
+type SetVariableRequest struct {
+	ComponentName string
+	VariableName  string
+	Value         string
+}
+
+// --- Firmware Service ---
+
+// FirmwareService handles firmware update operations
+type FirmwareService interface {
+	// UpdateFirmware initiates a firmware update on a charge point
+	UpdateFirmware(ctx context.Context, req *FirmwareUpdateRequest) (*FirmwareUpdateStatus, error)
+
+	// GetFirmwareStatus returns current firmware update status
+	GetFirmwareStatus(ctx context.Context, chargePointID string) (*FirmwareUpdateStatus, error)
+
+	// CancelFirmwareUpdate attempts to cancel a firmware update
+	CancelFirmwareUpdate(ctx context.Context, chargePointID string) error
+
+	// HandleStatusNotification processes firmware status notifications
+	HandleStatusNotification(chargePointID, status string, requestID *int) error
+}
+
+// FirmwareUpdateRequest for initiating firmware updates
+type FirmwareUpdateRequest struct {
+	ChargePointID      string     `json:"charge_point_id"`
+	FirmwareURL        string     `json:"firmware_url"`
+	Version            string     `json:"version"`
+	RetrieveDateTime   *time.Time `json:"retrieve_datetime,omitempty"`
+	InstallDateTime    *time.Time `json:"install_datetime,omitempty"`
+	Retries            *int       `json:"retries,omitempty"`
+	RetryInterval      *int       `json:"retry_interval,omitempty"`
+	SigningCertificate string     `json:"signing_certificate,omitempty"`
+	Signature          string     `json:"signature,omitempty"`
+}
+
+// FirmwareUpdateStatus represents firmware update status
+type FirmwareUpdateStatus struct {
+	ID            string    `json:"id"`
+	ChargePointID string    `json:"charge_point_id"`
+	Version       string    `json:"version"`
+	Status        string    `json:"status"`
+	Progress      int       `json:"progress"`
+	ErrorMessage  string    `json:"error_message,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// --- Message Queue Interface ---
+
+// MessageQueue interface for publishing events
+type MessageQueue interface {
+	Publish(topic string, message interface{}) error
+	Subscribe(topic string, handler func(message []byte)) error
+	Close() error
+}
