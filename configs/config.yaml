@@ -1,0 +1,230 @@
+# SIGEC-VE Enterprise Configuration
+
+app:
+  name: sigec-ve-enterprise
+  version: v1.0.0
+  environment: production # development, staging, production
+
+http:
+  port: 8080
+  allowed_origins:
+    - https://app.sigec-ve.com
+    - https://dashboard.sigec-ve.com
+  read_timeout: 30s
+  write_timeout: 30s
+  idle_timeout: 120s
+
+grpc:
+  port: 50051
+  max_connections: 1000
+
+ocpp:
+  port: 9000
+  version: 2.0.1
+  heartbeat_interval: 300 # seconds
+  websocket_ping_interval: 30s
+  security:
+    enabled: true
+    tls_cert: /certs/server.crt
+    tls_key: /certs/server.key
+    client_auth: true # mTLS
+
+database:
+  url: postgres://admin:password@postgres:5432/sigec?sslmode=require
+  max_open_conns: 100
+  max_idle_conns: 10
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 10m
+  auto_migrate: true
+  log_queries: false # Enable in development only
+
+redis:
+  url: redis://:password@redis:6379/0
+  max_retries: 3
+  pool_size: 100
+  min_idle_conns: 10
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  pool_timeout: 4s
+
+nats:
+  url: nats://nats:4222
+  max_reconnects: 10
+  reconnect_wait: 2s
+  timeout: 5s
+
+jwt:
+  secret: ${JWT_SECRET} # Use environment variable
+  access_token_duration: 15m
+  refresh_token_duration: 7d
+  issuer: sigec-ve.com
+  audience: sigec-ve-api
+
+gemini:
+  api_key: ${GEMINI_API_KEY}
+  model: gemini-2.0-flash-exp
+  voice_config:
+    voice_name: Aoede # Portuguese female voice
+    language: pt-BR
+    speech_model: gemini-2.0-flash-exp
+    response_modality: AUDIO
+  system_instruction: |
+    Você é EVA (Electric Vehicle Assistant), assistente virtual de estações de carregamento.
+    Seja profissional, clara e objetiva. Responda sempre em português brasileiro.
+    Suas funções:
+    - Verificar status de carregadores
+    - Iniciar/parar sessões
+    - Consultar custos e histórico
+    - Reportar problemas
+    - Agendar carregamentos
+
+opentelemetry:
+  enabled: true
+  jaeger:
+    endpoint: http://jaeger:14268/api/traces
+    sampler_type: probabilistic
+    sampler_param: 0.1 # 10% sampling in production
+  service_name: sigec-ve-enterprise
+  attributes:
+    deployment.environment: production
+    service.version: v1.0.0
+
+prometheus:
+  enabled: true
+  path: /metrics
+  port: 8080
+
+logging:
+  level: info # debug, info, warn, error
+  format: json # json or console
+  output: stdout # stdout or file path
+  sampling:
+    enabled: true
+    initial: 100
+    thereafter: 100
+
+rate_limiting:
+  enabled: true
+  max_requests: 100
+  window: 1m
+  by_user: true # Rate limit per user instead of IP
+
+circuit_breaker:
+  enabled: true
+  max_requests: 3
+  interval: 1m
+  timeout: 30s
+  failure_threshold: 0.6 # 60% failure rate to open
+
+cors:
+  enabled: true
+  allowed_origins:
+    - https://app.sigec-ve.com
+    - https://dashboard.sigec-ve.com
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+  allowed_headers:
+    - Origin
+    - Content-Type
+    - Accept
+    - Authorization
+  expose_headers:
+    - X-Request-ID
+  max_age: 86400 # 24 hours
+  credentials: true
+
+security:
+  enable_https: true
+  tls_cert_path: /certs/server.crt
+  tls_key_path: /certs/server.key
+  enable_mtls: true # For OCPP connections
+  ca_cert_path: /certs/ca.crt
+
+payment:
+  stripe:
+    secret_key: ${STRIPE_SECRET_KEY}
+    webhook_secret: ${STRIPE_WEBHOOK_SECRET}
+    currency: BRL
+  pricing:
+    per_kwh: 0.75 # R$ 0.75 per kWh
+    idle_fee_per_minute: 0.10 # R$ 0.10 per minute after charging complete
+
+notification:
+  email:
+    provider: sendgrid # sendgrid, ses, smtp
+    api_key: ${SENDGRID_API_KEY}
+    from: noreply@sigec-ve.com
+    from_name: SIGEC-VE
+  sms:
+    provider: twilio
+    account_sid: ${TWILIO_ACCOUNT_SID}
+    auth_token: ${TWILIO_AUTH_TOKEN}
+    from: +5511999999999
+  push:
+    provider: firebase
+    credentials_path: /secrets/firebase-credentials.json
+
+analytics:
+  enabled: true
+  batch_size: 1000
+  flush_interval: 5m
+  providers:
+    - bigquery
+    - segment
+
+feature_flags:
+  voice_assistant: true
+  smart_charging: true
+  v2g: false # Vehicle-to-Grid (coming soon)
+  blockchain_audit: false # Future feature
+
+# Cache TTL configurations
+cache:
+  device_status_ttl: 30s
+  user_session_ttl: 15m
+  transaction_summary_ttl: 5m
+  analytics_ttl: 1h
+
+# Background jobs schedule (cron format)
+jobs:
+  daily_report:
+    schedule: "0 0 * * *" # Midnight
+    enabled: true
+  
+  analytics_aggregation:
+    schedule: "*/5 * * * *" # Every 5 minutes
+    enabled: true
+  
+  device_health_check:
+    schedule: "*/1 * * * *" # Every minute
+    enabled: true
+  
+  invoice_generation:
+    schedule: "0 8 1 * *" # 8 AM on first day of month
+    enabled: true
+
+# Limits and quotas
+limits:
+  max_active_sessions_per_user: 1
+  max_transaction_duration: 12h
+  max_file_upload_size: 10MB
+  max_request_body_size: 1MB
+
+# Regional settings
+region:
+  timezone: America/Sao_Paulo
+  locale: pt_BR
+  currency: BRL
+
+# Compliance and audit
+compliance:
+  gdpr_enabled: true
+  data_retention_days: 2555 # 7 years
+  audit_log_enabled: true
+  pii_encryption: true

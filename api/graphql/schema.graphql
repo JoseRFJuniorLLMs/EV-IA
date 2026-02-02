@@ -1,0 +1,197 @@
+scalar DateTime
+scalar JSON
+
+type Query {
+  # Devices
+  device(id: ID!): ChargePoint
+  devices(
+    filter: DeviceFilter
+    pagination: PaginationInput
+  ): DeviceConnection!
+  
+  # Transactions
+  transaction(id: ID!): Transaction
+  myActiveTransaction: Transaction
+  transactionHistory(
+    userId: ID!
+    dateRange: DateRangeInput
+  ): [Transaction!]!
+  
+  # Voice
+  voiceInteractionHistory(userId: ID!): [VoiceInteraction!]!
+  
+  # Analytics
+  energyConsumption(
+    deviceId: ID
+    dateRange: DateRangeInput
+  ): EnergyStats!
+}
+
+type Mutation {
+  # Authentication
+  login(email: String!, password: String!): AuthPayload!
+  refreshToken(token: String!): AuthPayload!
+  
+  # Transactions
+  startCharging(
+    deviceId: ID!
+    connectorId: Int!
+    rfidTag: String
+  ): Transaction!
+  
+  stopCharging(transactionId: ID!): Transaction!
+  
+  # Voice
+  processVoiceCommand(
+    audio: String! # Base64
+    sessionId: String
+  ): VoiceResponse!
+  
+  # Device Management (Admin)
+  updateDeviceFirmware(deviceId: ID!, version: String!): ChargePoint!
+  resetDevice(deviceId: ID!): Boolean!
+}
+
+type Subscription {
+  # Real-time updates
+  deviceStatusChanged(deviceId: ID): DeviceStatusEvent!
+  transactionUpdated(userId: ID!): TransactionEvent!
+  voiceResponseReady(sessionId: String!): VoiceResponse!
+}
+
+type ChargePoint {
+  id: ID!
+  vendor: String!
+  model: String!
+  serialNumber: String!
+  firmwareVersion: String!
+  isOnline: Boolean!
+  lastHeartbeat: DateTime!
+  connectors: [Connector!]!
+  location: Location!
+  currentPower: Float!
+  energyDeliveredToday: Float!
+}
+
+type Connector {
+  id: Int!
+  status: ConnectorStatus!
+  type: ConnectorType!
+  maxPowerKw: Float!
+  currentTransaction: Transaction
+}
+
+enum ConnectorStatus {
+  AVAILABLE
+  OCCUPIED
+  CHARGING
+  FAULTED
+  UNAVAILABLE
+}
+
+enum ConnectorType {
+  CCS
+  CHADEMO
+  TYPE2
+  TESLA
+}
+
+type Transaction {
+  id: ID!
+  user: User!
+  chargePoint: ChargePoint!
+  connectorId: Int!
+  startTime: DateTime!
+  endTime: DateTime
+  energyDelivered: Float!
+  currentCost: Float!
+  status: TransactionStatus!
+  meterValues: [MeterValue!]!
+}
+
+enum TransactionStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+type VoiceInteraction {
+  id: ID!
+  userId: ID!
+  timestamp: DateTime!
+  transcript: String!
+  intent: String!
+  confidence: Float!
+  response: String!
+  actionTaken: String
+}
+
+type VoiceResponse {
+  text: String!
+  audio: String! # Base64
+  intent: String!
+  confidence: Float!
+  actionResult: JSON
+}
+
+type AuthPayload {
+  token: String!
+  refreshToken: String!
+  expiresIn: Int!
+  user: User!
+}
+
+type User {
+  id: ID!
+  email: String!
+  name: String!
+  role: UserRole!
+  activeTransactions: [Transaction!]!
+}
+
+enum UserRole {
+  USER
+  OPERATOR
+  ADMIN
+}
+
+input DeviceFilter {
+  status: ConnectorStatus
+  minPower: Float
+  location: LocationFilter
+}
+
+input LocationFilter {
+  latitude: Float!
+  longitude: Float!
+  radiusKm: Float!
+}
+
+input PaginationInput {
+  page: Int!
+  pageSize: Int!
+}
+
+input DateRangeInput {
+  from: DateTime!
+  to: DateTime!
+}
+
+type DeviceConnection {
+  edges: [DeviceEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type DeviceEdge {
+  node: ChargePoint!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}

@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package device.v1;
+
+option go_package = "github.com/seu-repo/sigec-ve/api/proto/device/v1;devicev1";
+
+import "google/protobuf/timestamp.proto";
+
+service DeviceService {
+  rpc GetDevice(GetDeviceRequest) returns (GetDeviceResponse);
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc UpdateDeviceStatus(UpdateDeviceStatusRequest) returns (UpdateDeviceStatusResponse);
+  rpc StreamDeviceEvents(StreamDeviceEventsRequest) returns (stream DeviceEvent);
+}
+
+message GetDeviceRequest {
+  string device_id = 1;
+}
+
+message GetDeviceResponse {
+  Device device = 1;
+}
+
+message ListDevicesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  string filter = 3; // "status=Available AND power>50"
+}
+
+message ListDevicesResponse {
+  repeated Device devices = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message Device {
+  string id = 1;
+  string vendor = 2;
+  string model = 3;
+  string serial_number = 4;
+  string firmware_version = 5;
+  bool is_online = 6;
+  google.protobuf.Timestamp last_heartbeat = 7;
+  repeated Connector connectors = 8;
+  Location location = 9;
+}
+
+message Connector {
+  int32 connector_id = 1;
+  string status = 2;
+  double max_power_kw = 3;
+  string type = 4; // "CCS", "CHAdeMO", "Type2"
+}
+
+message Location {
+  double latitude = 1;
+  double longitude = 2;
+  string address = 3;
+}
+
+message UpdateDeviceStatusRequest {
+  string device_id = 1;
+  string status = 2;
+}
+
+message UpdateDeviceStatusResponse {
+  bool success = 1;
+}
+
+message StreamDeviceEventsRequest {
+  string device_id = 1; // vazio = todos os devices
+}
+
+message DeviceEvent {
+  string event_type = 1; // "status_changed", "heartbeat", "error"
+  string device_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> metadata = 4;
+}
