@@ -264,20 +264,36 @@ type VoiceResponse struct {
 - `ValidateToken(token)` -> *User
 
 ### DeviceService
-- `GetDevice(id)` -> *ChargePoint
+- `GetDevice(id)` -> *ChargePoint (com cache Redis)
 - `ListDevices(filter)` -> []ChargePoint
-- `UpdateStatus(id, status)` -> error
+- `UpdateStatus(id, status)` -> error (invalida cache, publica evento)
 - `GetNearby(lat, lon, radius)` -> []ChargePoint
+- `ListAvailableDevices()` -> []ChargePoint (para VoiceAssistant)
 
 ### TransactionService
 - `StartTransaction(deviceID, connectorID, userID)` -> *Transaction
-- `StopTransaction(txID)` -> *Transaction
+- `StopTransaction(txID)` -> *Transaction (calcula custo, publica eventos)
 - `GetActiveTransaction(userID)` -> *Transaction
 - `GetTransactionHistory(userID)` -> []Transaction
+- `StartCharging(userID, stationID)` -> *Transaction (para VoiceAssistant)
+- `StopActiveCharging(userID)` -> error (para VoiceAssistant)
+- `GetCurrentSessionCost(userID)` -> float64 (para VoiceAssistant)
 
 ### VoiceAssistant (Gemini Live API)
 - `ProcessVoiceCommand(ctx, userID, audioChunk)` -> *VoiceResponse
 - Intents: check_status, start_charge, stop_charge, check_cost, report_issue
+
+### BillingService (NOVO)
+- `CalculateCost(tx)` -> float64 (com peak pricing e idle fee)
+- `ProcessPayment(tx)` -> error (publica para Stripe)
+- `GetPricePerKWh()` -> float64 (rate atual)
+- `GenerateInvoice(tx)` -> *Invoice
+
+### SmartChargingService (NOVO)
+- `OptimizeCharging(deviceID, connectorID, targetEnergy, departureTime)` -> *ChargingProfile
+- `GetChargingProfile(deviceID, connectorID)` -> *ChargingProfile
+- `ClearChargingProfile(deviceID, connectorID)` -> error
+- `LoadBalance()` -> error (distribui carga entre carregadores)
 
 ---
 
@@ -523,30 +539,35 @@ helm install sigec deployments/kubernetes/helm/sigec-ve
 
 ### Implementado
 - [x] Arquitetura Hexagonal completa
-- [x] Core models (User, ChargePoint, Transaction)
+- [x] Core models (User, ChargePoint, Transaction, Voice)
 - [x] PostgreSQL adapter com GORM
-- [x] Redis cache
-- [x] NATS messaging
+- [x] Redis cache (ATIVO - com TTL e invalidacao)
+- [x] NATS messaging (ATIVO - publicacao de eventos)
 - [x] JWT authentication
 - [x] REST API com Fiber
 - [x] gRPC basics
-- [x] OCPP 2.0.1 servidor
+- [x] OCPP 2.0.1 servidor (incluindo TransactionEvent Started/Updated/Ended)
 - [x] Gemini Live API integration
 - [x] OpenTelemetry + Jaeger
 - [x] Docker + Kubernetes
 - [x] CI/CD GitHub Actions
 - [x] Background workers
+- [x] VoiceAssistant completo (check_status, start_charge, stop_charge, check_cost, report_issue)
+- [x] Prometheus metrics (metricas de negocio e infraestrutura)
+- [x] BillingService (calculo de custo, peak pricing, idle fee, invoice)
+- [x] SmartChargingService (otimizacao, load balancing, peak shaving)
 
 ### Pendente
-- [ ] Integracao real Stripe (payment)
+- [ ] Integracao real Stripe (payment gateway)
 - [ ] Notificacoes (Email, SMS, Push)
-- [ ] OCPP completo (RemoteStart, FirmwareUpdate)
-- [ ] RBAC refinado
+- [ ] OCPP completo (RemoteStart, FirmwareUpdate, Reset)
+- [ ] RBAC refinado (oauth2_service, rbac_service)
 - [ ] Testes unitarios/integracao
 - [ ] Frontend web app
-- [ ] Analytics e previsao
+- [ ] Analytics e previsao avancada
 - [ ] V2G (Vehicle-to-Grid)
 - [ ] Blockchain audit trail
+- [ ] Geolocalizacao real (PostGIS)
 
 ---
 

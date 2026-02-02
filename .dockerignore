@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+coverage.out
+coverage.html
+*.prof
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Local configuration
+.env
+.env.local
+.env.*.local
+*.local.yml
+*.local.yaml
+
+# Kubernetes secrets (should never be in image)
+*secret*
+*credential*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Testing
+testdata/
+*_test.go
+mock_*.go

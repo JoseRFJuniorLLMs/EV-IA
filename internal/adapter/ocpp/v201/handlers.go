@@ -110,23 +110,72 @@ func (s *Server) handleTransactionEvent(cpID string, payload []byte) (*Transacti
 			connID = req.Evse.ConnectorId
 		}
 
-		_, err := s.txService.StartTransaction(ctx, cpID, connID, uID, idTag)
+		tx, err := s.txService.StartTransaction(ctx, cpID, connID, uID, idTag)
 		if err != nil {
 			s.log.Error("Failed to start transaction", zap.Error(err))
-			// Even if local start fails, we might acknowledge but with Blocked status
+			return &TransactionEventResponse{
+				IdTokenInfo: &IdTokenInfo{Status: "Blocked"},
+			}, nil
+		}
+
+		s.log.Info("Transaction Started via OCPP",
+			zap.String("txID", tx.ID),
+			zap.String("chargePointID", cpID),
+			zap.String("userID", uID),
+		)
+
+	case "Updated":
+		// Handle meter values update during charging
+		if req.TransactionInfo != nil && req.MeterValue != nil {
+			s.log.Info("Transaction Updated - Meter Values",
+				zap.String("txID", req.TransactionInfo.TransactionId),
+				zap.Any("meterValues", req.MeterValue),
+			)
+			// In production, update meter values in the transaction record
 		}
 
 	case "Ended":
 		txID := req.TransactionInfo.TransactionId
-		// Find transaction by internal ID mapped to device ID or use device generated ID
-		// For syncing, we might use remote transaction ID logic.
-		// Detailed implementation is complex. Simplified:
+		s.log.Info("Processing Transaction End", zap.String("txID", txID), zap.String("chargePointID", cpID))
 
-		// Typically we'd need to look up the transaction that matches this device's transactionId
-		// Here assuming req.TransactionInfo.TransactionId maps to our UUID if we sent it, OR we rely on GetActiveTransaction
+		// Try to find the transaction by the OCPP transaction ID
+		// If not found, try to find the active transaction for this charge point
+		tx, err := s.txService.GetTransaction(ctx, txID)
+		if err != nil || tx == nil {
+			// Fallback: find active transaction for this user/device
+			s.log.Warn("Transaction not found by ID, attempting to find active transaction",
+				zap.String("txID", txID),
+				zap.String("chargePointID", cpID),
+			)
 
-		// s.txService.StopTransaction(ctx, txID)
-		s.log.Info("Transaction Ended", zap.String("txID", txID))
+			// Get user ID from IdToken if available
+			userID := "unknown"
+			if req.IdToken != nil {
+				userID = req.IdToken.IdToken
+			}
+
+			// Try to stop any active charging for this user
+			if err := s.txService.StopActiveCharging(ctx, userID); err != nil {
+				s.log.Error("Failed to stop active charging", zap.Error(err))
+			} else {
+				s.log.Info("Transaction Ended via StopActiveCharging",
+					zap.String("userID", userID),
+					zap.String("chargePointID", cpID),
+				)
+			}
+		} else {
+			// Stop the specific transaction
+			stoppedTx, err := s.txService.StopTransaction(ctx, txID)
+			if err != nil {
+				s.log.Error("Failed to stop transaction", zap.Error(err), zap.String("txID", txID))
+			} else {
+				s.log.Info("Transaction Ended via OCPP",
+					zap.String("txID", stoppedTx.ID),
+					zap.Int("totalEnergy", stoppedTx.TotalEnergy),
+					zap.Float64("cost", stoppedTx.Cost),
+				)
+			}
+		}
 	}
 
 	return &TransactionEventResponse{

@@ -12,12 +12,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/websocket/v2"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-
-	// "google.golang.org/grpc" // Commented out to avoid unused import error if not yet used, but line 19 was in source. Keep it if used below.
 
 	// Internal packages
 	"github.com/seu-repo/sigec-ve/internal/adapter/ai/gemini"
@@ -35,6 +35,9 @@ import (
 	"github.com/seu-repo/sigec-ve/internal/service/transaction"
 	"github.com/seu-repo/sigec-ve/internal/service/voice"
 	"github.com/seu-repo/sigec-ve/pkg/config"
+
+	// Import metrics to register them
+	_ "github.com/seu-repo/sigec-ve/internal/observability/telemetry"
 )
 
 const (
@@ -138,7 +141,7 @@ func main() {
 
 	// Global Middleware
 	app.Use(recover.New())
-	app.Use(logger.New()) // Fixed: logger.New() returns a fiber middleware handler
+	app.Use(fiberlogger.New()) // Fiber logger middleware
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.HTTP.AllowedOrigins,
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
@@ -166,19 +169,9 @@ func main() {
 
 	// Metrics endpoint for Prometheus
 	app.Get("/metrics", func(c *fiber.Ctx) error {
-		handler := promhttp.Handler()
-		// Adapt net/http handler to fiber
-		// This is a naive adaptation. Fiber has a proper adapter in fiber/adaptor
-		// But for now keeping it simple or assuming adaptor usage if we had the import
-		// Since we don't have github.com/gofiber/adaptor/v2 import, this line 169 in source was:
-		// handler.ServeHTTP(c.Response().BodyWriter(), c.Request())
-		// which works if we access internal fasthttp mechanics, but usually requires adaptor.
-		// For safety, I'll comment out the body and just return 200 OK with "Metrics" placeholder if adaptor missing
-		// But the source code had: handler.ServeHTTP(c.Response().BodyWriter(), c.Request())
-		// Let's try to match source, but `c.Request()` returns `*fasthttp.Request` which isn't `*http.Request`.
-		// The source code provided is `cmd_server_main.go`. I should reproduce it exactly,
-		// but I noticed `google.golang.org/grpc` was imported but `net` was missing for `net.Listen`.
-		// I added `net` to imports above.
+		// Adapt net/http handler to fasthttp for Fiber
+		handler := fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())
+		handler(c.Context())
 		return nil
 	})
 

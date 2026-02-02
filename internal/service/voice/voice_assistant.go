@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/seu-repo/sigec-ve/internal/adapter/ai/gemini"
-	"github.com/seu-repo/sigec-ve/internal/core/domain"
-	"github.com/seu-repo/sigec-ve/internal/core/ports"
+	"github.com/seu-repo/sigec-ve/internal/domain"
+	"github.com/seu-repo/sigec-ve/internal/ports"
 	"go.uber.org/zap"
 )
 
@@ -120,30 +120,54 @@ func (va *VoiceAssistant) executeAction(
 
 	switch intent.Name {
 	case "check_status":
-		devices, _ := va.deviceService.ListAvailableDevices(ctx)
-		return fmt.Sprintf("Existem %d carregadores disponíveis no momento", len(devices))
+		devices, err := va.deviceService.ListAvailableDevices(ctx)
+		if err != nil {
+			va.logger.Error("Failed to list available devices", zap.Error(err))
+			return "Desculpe, não consegui verificar os carregadores disponíveis no momento."
+		}
+		if len(devices) == 0 {
+			return "No momento não há carregadores disponíveis. Por favor, tente novamente em alguns minutos."
+		}
+		return fmt.Sprintf("Existem %d carregadores disponíveis no momento.", len(devices))
 
 	case "start_charge":
-		stationID := intent.Entities["station_id"]
+		stationID := ""
+		if intent.Entities != nil {
+			stationID = intent.Entities["station_id"]
+		}
 		tx, err := va.txService.StartCharging(ctx, userID, stationID)
 		if err != nil {
-			return "Não foi possível iniciar o carregamento. Verifique se há um carregador disponível."
+			va.logger.Error("Failed to start charging", zap.Error(err), zap.String("user_id", userID))
+			return fmt.Sprintf("Não foi possível iniciar o carregamento: %s", err.Error())
 		}
-		return fmt.Sprintf("Carregamento iniciado com sucesso! ID da sessão: %s", tx.ID)
+		return fmt.Sprintf("Carregamento iniciado com sucesso! ID da sessão: %s. Você será notificado quando terminar.", tx.ID)
 
 	case "stop_charge":
 		err := va.txService.StopActiveCharging(ctx, userID)
 		if err != nil {
-			return "Não foi possível parar o carregamento."
+			va.logger.Error("Failed to stop charging", zap.Error(err), zap.String("user_id", userID))
+			return fmt.Sprintf("Não foi possível parar o carregamento: %s", err.Error())
 		}
-		return "Carregamento finalizado com sucesso!"
+		return "Carregamento finalizado com sucesso! O valor será cobrado automaticamente."
 
 	case "check_cost":
-		cost, _ := va.txService.GetCurrentSessionCost(ctx, userID)
-		return fmt.Sprintf("O custo atual da sua sessão é R$ %.2f", cost)
+		cost, err := va.txService.GetCurrentSessionCost(ctx, userID)
+		if err != nil {
+			va.logger.Warn("Failed to get current session cost", zap.Error(err))
+			return "Você não possui uma sessão de carregamento ativa no momento."
+		}
+		return fmt.Sprintf("O custo estimado da sua sessão atual é R$ %.2f.", cost)
+
+	case "report_issue":
+		// Log the issue for later processing
+		va.logger.Info("User reported issue via voice",
+			zap.String("user_id", userID),
+			zap.String("issue_text", intent.Entities["issue_description"]),
+		)
+		return "Seu problema foi registrado. Nossa equipe de suporte entrará em contato em breve."
 
 	default:
-		return "Desculpe, não entendi o que você precisa. Pode repetir?"
+		return "Desculpe, não entendi o que você precisa. Você pode perguntar sobre carregadores disponíveis, iniciar ou parar um carregamento, ou verificar o custo da sessão atual."
 	}
 }
 
