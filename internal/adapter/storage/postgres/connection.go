@@ -7,8 +7,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	"github.com/seu-repo/sigec-ve/internal/domain"
 )
 
 // NewConnection initializes a new PostgreSQL connection using GORM
