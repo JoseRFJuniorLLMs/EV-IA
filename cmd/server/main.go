@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -80,7 +81,11 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to connect to database", zap.Error(err))
 	}
-	defer db.Close()
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Fatal("Failed to get underlying SQL DB", zap.Error(err))
+	}
+	defer sqlDB.Close()
 
 	// Run migrations
 	if err := postgres.RunMigrations(db); err != nil {
@@ -125,7 +130,7 @@ func main() {
 	}()
 
 	// 11. Initialize WebSocket Hub (for real-time updates)
-	wsHub := wsAdapter.NewHub(logger)
+	wsHub := wsAdapter.NewHub()
 	go wsHub.Run()
 
 	// 12. Initialize Voice Stream Handler
@@ -143,7 +148,7 @@ func main() {
 	app.Use(recover.New())
 	app.Use(fiberlogger.New()) // Fiber logger middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: cfg.HTTP.AllowedOrigins,
+		AllowOrigins: strings.Join(cfg.HTTP.AllowedOrigins, ","),
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
@@ -158,7 +163,7 @@ func main() {
 	})
 	app.Get("/health/ready", func(c *fiber.Ctx) error {
 		// Check all dependencies
-		if err := db.Ping(); err != nil {
+		if err := sqlDB.Ping(); err != nil {
 			return c.Status(503).SendString("Database not ready")
 		}
 		if err := redisCache.Ping(); err != nil {
