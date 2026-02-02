@@ -55,10 +55,10 @@ func (c *LiveClient) ConnectVoiceStream(ctx context.Context) error {
 			"model": "models/" + c.modelID,
 			"generation_config": map[string]interface{}{
 				"response_modalities": []string{"AUDIO"},
-				"speech_config": map[string]string{
-					"voice_config": map[string]string{
+				"speech_config": map[string]interface{}{
+					"voice_config": map[string]interface{}{
 						"prebuilt_voice_config": map[string]string{
-							"voice_name": "Aoede", // Voz feminina brasileira
+							"voice_name": "Aoede",
 						},
 					},
 				},

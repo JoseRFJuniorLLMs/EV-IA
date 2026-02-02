@@ -376,19 +376,6 @@ type MeterValue struct {
 	Context   string    `json:"context"`
 }
 
-// Alert represents a system alert
-type Alert struct {
-	ID           string    `json:"id"`
-	Type         string    `json:"type"`
-	Severity     string    `json:"severity"`
-	Title        string    `json:"title"`
-	Message      string    `json:"message"`
-	Source       string    `json:"source"`
-	SourceID     string    `json:"source_id,omitempty"`
-	Acknowledged bool      `json:"acknowledged"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
 // --- V2G (Vehicle-to-Grid) Services ---
 
 // V2GService handles Vehicle-to-Grid operations
