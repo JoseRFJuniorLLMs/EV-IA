@@ -30,7 +30,7 @@ ocpp:
     client_auth: true # mTLS
 
 database:
-  url: postgres://admin:password@postgres:5432/sigec?sslmode=require
+  url: postgres://postgres:Debian23%40@localhost:5432/ev-db?sslmode=disable
   max_open_conns: 100
   max_idle_conns: 10
   conn_max_lifetime: 1h
@@ -39,7 +39,7 @@ database:
   log_queries: false # Enable in development only
 
 redis:
-  url: redis://:password@redis:6379/0
+  url: redis://localhost:6379/0
   max_retries: 3
   pool_size: 100
   min_idle_conns: 10
@@ -49,7 +49,7 @@ redis:
   pool_timeout: 4s
 
 nats:
-  url: nats://nats:4222
+  url: nats://localhost:4222
   max_reconnects: 10
   reconnect_wait: 2s
   timeout: 5s
@@ -80,9 +80,9 @@ gemini:
     - Agendar carregamentos
 
 opentelemetry:
-  enabled: true
+  enabled: false
   jaeger:
-    endpoint: http://jaeger:14268/api/traces
+    endpoint: http://localhost:14268/api/traces
     sampler_type: probabilistic
     sampler_param: 0.1 # 10% sampling in production
   service_name: sigec-ve-enterprise
