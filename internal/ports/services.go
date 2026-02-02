@@ -593,3 +593,62 @@ type MessageQueue interface {
 	Subscribe(topic string, handler func(message []byte)) error
 	Close() error
 }
+
+// --- ISO 15118 (Plug & Charge) Services ---
+
+// ISO15118Service handles ISO 15118 Plug & Charge operations
+type ISO15118Service interface {
+	// AuthenticateVehicle authenticates a vehicle using its ISO 15118 certificate
+	AuthenticateVehicle(ctx context.Context, certChain []byte) (*domain.ISO15118VehicleIdentity, error)
+
+	// ValidateCertificate validates an ISO 15118 certificate chain
+	ValidateCertificate(ctx context.Context, certPEM []byte) error
+
+	// GetChargingContract retrieves the charging contract for a vehicle
+	GetChargingContract(ctx context.Context, emaid string) (*domain.ChargingContract, error)
+
+	// RevokeCertificate revokes an ISO 15118 certificate
+	RevokeCertificate(ctx context.Context, emaid, reason string) error
+
+	// GetCertificateStatus gets the status of a certificate
+	GetCertificateStatus(ctx context.Context, emaid string) (*ISO15118CertificateStatus, error)
+}
+
+// ISO15118CertificateStatus represents the status of an ISO 15118 certificate
+type ISO15118CertificateStatus struct {
+	EMAID            string     `json:"emaid"`
+	ContractID       string     `json:"contract_id"`
+	Valid            bool       `json:"valid"`
+	Expired          bool       `json:"expired"`
+	Revoked          bool       `json:"revoked"`
+	RevokedAt        *time.Time `json:"revoked_at,omitempty"`
+	RevocationReason string     `json:"revocation_reason,omitempty"`
+	ValidFrom        time.Time  `json:"valid_from"`
+	ValidTo          time.Time  `json:"valid_to"`
+	DaysUntilExpiry  int        `json:"days_until_expiry"`
+	V2GCapable       bool       `json:"v2g_capable"`
+}
+
+// ISO15118Repository handles ISO 15118 certificate persistence
+type ISO15118Repository interface {
+	// StoreCertificate stores a new certificate
+	StoreCertificate(ctx context.Context, cert interface{}) error
+
+	// GetCertificateByEMAID retrieves a certificate by EMAID
+	GetCertificateByEMAID(ctx context.Context, emaid string) (interface{}, error)
+
+	// GetCertificateByContractID retrieves a certificate by contract ID
+	GetCertificateByContractID(ctx context.Context, contractID string) (interface{}, error)
+
+	// GetCertificateByVIN retrieves certificates by vehicle VIN
+	GetCertificateByVIN(ctx context.Context, vin string) ([]interface{}, error)
+
+	// UpdateCertificate updates an existing certificate
+	UpdateCertificate(ctx context.Context, cert interface{}) error
+
+	// GetExpiringCertificates retrieves certificates expiring within N days
+	GetExpiringCertificates(ctx context.Context, daysUntilExpiry int) ([]interface{}, error)
+
+	// GetV2GCapableCertificates retrieves all V2G-capable certificates
+	GetV2GCapableCertificates(ctx context.Context) ([]interface{}, error)
+}

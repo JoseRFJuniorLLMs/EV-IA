@@ -187,13 +187,186 @@ firmware.update.failed         → Falha na atualização
 
 ## Próximos Passos
 
-1. [ ] Implementar handlers HTTP/REST para os novos endpoints
-2. [ ] Criar repositório V2G (PostgreSQL)
-3. [ ] Integrar com sistema de pagamentos para compensação V2G
-4. [ ] Adicionar testes unitários
-5. [ ] Integrar com API CCEE para preços reais da rede
-6. [ ] Adicionar suporte a certificados ISO 15118
+1. [x] Implementar handlers HTTP/REST para os novos endpoints
+2. [x] Criar repositório V2G (PostgreSQL)
+3. [x] Integrar com sistema de pagamentos para compensação V2G
+4. [x] Adicionar testes unitários
+5. [x] Integrar com API CCEE para preços reais da rede
+6. [x] Adicionar suporte a certificados ISO 15118
 
 ---
 
-*Implementado em: Fevereiro 2026*
+## Fase 2 - Implementação Completa (Fevereiro 2026)
+
+### Novos Arquivos Criados
+
+#### 12. `internal/adapter/http/fiber/handlers/device_commands.go` (~400 linhas)
+- Handler RemoteStart, RemoteStop, Reset
+- Handler TriggerMessage
+- Handler SetChargingProfile, ClearChargingProfile
+- Handler UpdateFirmware, GetFirmwareStatus
+- Handler UnlockConnector, ChangeAvailability
+
+#### 13. `internal/adapter/http/fiber/handlers/v2g.go` (~400 linhas)
+- Handler StartDischarge, StopDischarge
+- Handler GetSession, GetActiveSession
+- Handler GetCapability
+- Handler GetCurrentGridPrice, GetPriceForecast
+- Handler GetPreferences, SetPreferences
+- Handler GetUserStats, CalculateCompensation
+- Handler OptimizeV2G
+
+#### 14. `internal/adapter/storage/postgres/v2g_repository.go` (~350 linhas)
+- CreateSession, UpdateSession, GetSession
+- GetSessionsByChargePoint, GetSessionsByUser
+- GetActiveSessions
+- SavePreferences, GetPreferences
+- CreateEvent, GetEventsBySession
+- GetUserStats, GetChargePointStats, GetGlobalStats
+- GetPendingCompensations, MarkCompensationPaid
+
+#### 15. `internal/adapter/storage/migrations/002_v2g_tables.sql` (~330 linhas)
+- Tabela `v2g_sessions` - Sessões de V2G
+- Tabela `v2g_preferences` - Preferências de usuário
+- Tabela `v2g_events` - Eventos para auditoria
+- Tabela `v2g_compensations` - Compensações de V2G
+- Tabela `v2g_grid_prices` - Cache de preços da rede
+- Tabela `v2g_capabilities` - Capacidades V2G detectadas
+- Tabela `iso15118_certificates` - Certificados Plug & Charge
+- Tabela `firmware_updates` - Atualizações de firmware
+- Índices e triggers para updated_at
+
+#### 16. `internal/service/v2g/payment_service.go` (~290 linhas)
+- V2GPaymentService para compensação de V2G
+- CalculateAndRecordCompensation
+- ProcessPayout (pagamento para carteira do usuário)
+- ProcessSessionCompensation (fluxo completo)
+- BatchProcessPendingPayouts
+- GenerateCompensationReport
+
+#### 17. `internal/service/v2g/ccee_client.go` (~350 linhas)
+- CCEEClient para API da CCEE (Câmara de Comercialização de Energia Elétrica)
+- GetCurrentPLD (Preço de Liquidação das Diferenças)
+- GetPrices (preços por região e período)
+- Fallback com preços simulados
+- ConvertPLDToRetail (conversão MWh para kWh com impostos)
+- Suporte a 4 regiões: SE/CO, S, NE, N
+- Modelo de tarifação brasileiro (pesada/média/leve)
+
+#### 18. `internal/service/v2g/iso15118_service.go` (~450 linhas)
+- ISO15118Service para Plug & Charge
+- AuthenticateVehicle - Autenticação via certificado X.509
+- ValidateCertificate - Validação de cadeia de certificados
+- GetChargingContract - Obter contrato de carregamento
+- RevokeCertificate - Revogar certificado
+- InstallCertificate - Instalar novo certificado
+- GetCertificateStatus - Status do certificado
+- Cache de validações
+- Extração de identidade do veículo (EMAID, VIN, ContractID)
+
+#### 19. `internal/adapter/storage/postgres/iso15118_repository.go` (~250 linhas)
+- ISO15118Repository para persistência de certificados
+- StoreCertificate, GetCertificateByEMAID
+- GetCertificateByContractID, GetCertificateByVIN
+- UpdateCertificate, DeleteCertificate
+- GetExpiringCertificates, GetV2GCapableCertificates
+- GetCertificateStats
+
+### Testes Unitários Criados
+
+#### 20. `internal/service/v2g/service_test.go` (~350 linhas)
+- MockV2GRepository, MockGridPriceService, MockOCPPCommandService
+- TestV2GService_CheckV2GCapability
+- TestV2GService_SetUserPreferences
+- TestV2GService_GetUserPreferences
+- TestV2GService_GetUserStats
+- TestV2GService_CalculateCompensation
+
+#### 21. `internal/service/v2g/grid_price_test.go` (~250 linhas)
+- TestGridPriceService_GetCurrentPrice
+- TestGridPriceService_IsPeakHour
+- TestGridPriceService_GetPriceForecast
+- TestGridPriceService_CalculateV2GCompensation
+- TestGridPriceService_PeakHourPricing
+- TestGridPriceService_BrazilianTariffStructure
+
+#### 22. `internal/service/v2g/ccee_client_test.go` (~300 linhas)
+- TestCCEEClient_DefaultConfig
+- TestCCEEClient_GetSimulatedPrices
+- TestCCEEClient_RegionalPricing
+- TestCCEEClient_GetCurrentPLD
+- TestCCEEClient_ConvertPLDToRetail
+- TestCCEEClient_GetLoadLevel
+- TestCCEEClient_SimulatedPricingModel
+
+#### 23. `internal/service/v2g/iso15118_service_test.go` (~400 linhas)
+- MockISO15118Repository
+- Helper para gerar certificados de teste
+- TestISO15118Service_ParseCertificateChain
+- TestISO15118Service_ExtractVehicleIdentity
+- TestISO15118Service_ValidateCertificate
+- TestISO15118Service_AuthenticateVehicle
+- TestISO15118Service_InstallCertificate
+- TestISO15118Service_RevokeCertificate
+- TestISO15118Service_GetCertificateStatus
+- TestISO15118Service_GetChargingContract
+
+#### 24. `internal/service/v2g/payment_service_test.go` (~350 linhas)
+- MockWalletService, MockMessageQueue
+- TestPaymentConfig_Defaults
+- TestV2GPaymentService_CalculateAndRecordCompensation
+- TestV2GPaymentService_ProcessPayout
+- TestV2GPaymentService_ProcessSessionCompensation
+- TestV2GPaymentService_OperatorMarginCalculation
+- TestV2GPaymentService_MultiplePayouts
+
+---
+
+## Estatísticas Atualizadas
+
+| Métrica | Valor |
+|---------|-------|
+| Linhas de código adicionadas | ~6.500 |
+| Arquivos criados | 18 |
+| Arquivos modificados | 6 |
+| Mensagens OCPP implementadas | 25+ |
+| Interfaces de serviço | 8 |
+| Endpoints REST | 20+ |
+| Tabelas PostgreSQL | 8 |
+| Testes unitários | 50+ |
+
+---
+
+## Configuração do Ambiente
+
+O servidor de produção (`eva-ia.org`) já possui:
+- PostgreSQL 16 configurado
+- Redis 7.0 configurado
+- NATS JetStream configurado
+- Arquivo `.env` com todas as variáveis
+
+### Variáveis de Ambiente Necessárias
+
+```env
+# Banco de dados
+DATABASE_URL=postgres://...
+
+# CCEE (Preços de energia)
+CCEE_API_KEY=...
+CCEE_BASE_URL=https://api.ccee.org.br/v1
+
+# Pagamentos
+STRIPE_SECRET_KEY=...
+WALLET_SERVICE_URL=...
+
+# ISO 15118
+ISO15118_ROOT_CA_PATH=/certs/v2g-root-ca.pem
+ISO15118_SUB_CA_PATH=/certs/v2g-sub-ca.pem
+ISO15118_CPO_CERT_PATH=/certs/cpo-cert.pem
+ISO15118_CPO_KEY_PATH=/certs/cpo-key.pem
+```
+
+---
+
+*Implementação Fase 1: Fevereiro 2026*
+*Implementação Fase 2: Fevereiro 2026*
