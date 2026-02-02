@@ -57,7 +57,7 @@ nats:
 jwt:
   secret: ${JWT_SECRET} # Use environment variable
   access_token_duration: 15m
-  refresh_token_duration: 7d
+  refresh_token_duration: 168h # 7 days
   issuer: sigec-ve.com
   audience: sigec-ve-api
 
@@ -87,8 +87,8 @@ opentelemetry:
     sampler_param: 0.1 # 10% sampling in production
   service_name: sigec-ve-enterprise
   attributes:
-    deployment.environment: production
-    service.version: v1.0.0
+    deployment: production
+    service: v1.0.0
 
 prometheus:
   enabled: true
