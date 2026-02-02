@@ -20,6 +20,7 @@ type TransactionRepository interface {
 	FindByID(ctx context.Context, id string) (*domain.Transaction, error)
 	FindActiveByUserID(ctx context.Context, userID string) (*domain.Transaction, error)
 	FindHistoryByUserID(ctx context.Context, userID string) ([]domain.Transaction, error)
+	FindByDate(ctx context.Context, date time.Time) ([]domain.Transaction, error)
 	Update(ctx context.Context, tx *domain.Transaction) error
 }
 

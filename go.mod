@@ -23,6 +23,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.23.1
 	github.com/prometheus/client_golang v1.18.0
 	github.com/sony/gobreaker v0.5.0
+	nhooyr.io/websocket v1.8.10
 )
 
 require (

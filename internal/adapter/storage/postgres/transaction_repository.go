@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -60,4 +61,12 @@ func (r *TransactionRepository) FindHistoryByUserID(ctx context.Context, userID 
 
 func (r *TransactionRepository) Update(ctx context.Context, tx *domain.Transaction) error {
 	return r.db.WithContext(ctx).Save(tx).Error
+}
+
+func (r *TransactionRepository) FindByDate(ctx context.Context, date time.Time) ([]domain.Transaction, error) {
+	var txs []domain.Transaction
+	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+	err := r.db.WithContext(ctx).Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay).Find(&txs).Error
+	return txs, err
 }

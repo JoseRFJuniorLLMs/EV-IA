@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/seu-repo/sigec-ve/internal/core/domain"
-	"github.com/seu-repo/sigec-ve/internal/core/ports"
+	"github.com/seu-repo/sigec-ve/internal/domain"
+	"github.com/seu-repo/sigec-ve/internal/ports"
 )
 
 type EnergyAnalytics struct {
@@ -28,8 +28,9 @@ func (ea *EnergyAnalytics) GenerateDailyReport(ctx context.Context, date time.Ti
 	}
 
 	for _, tx := range transactions {
-		report.TotalEnergy += tx.EnergyDelivered
+		report.TotalEnergy += float64(tx.TotalEnergy) / 1000.0 // Convert Wh to kWh
 		report.TotalRevenue += tx.Cost
+		report.TotalTransactions++
 	}
 
 	return report, nil
