@@ -78,15 +78,17 @@ func (s *Service) UpdateStatus(ctx context.Context, id string, status domain.Cha
 		s.log.Warn("Failed to invalidate cache", zap.String("id", id), zap.Error(err))
 	}
 
-	// Publish event
-	event := map[string]interface{}{
-		"device_id": id,
-		"status":    status,
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	}
-	if data, err := json.Marshal(event); err == nil {
-		if err := s.mq.Publish("device.status.changed", data); err != nil {
-			s.log.Warn("Failed to publish status change event", zap.Error(err))
+	// Publish event (if message queue available)
+	if s.mq != nil {
+		event := map[string]interface{}{
+			"device_id": id,
+			"status":    status,
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		}
+		if data, err := json.Marshal(event); err == nil {
+			if err := s.mq.Publish("device.status.changed", data); err != nil {
+				s.log.Warn("Failed to publish status change event", zap.Error(err))
+			}
 		}
 	}
 

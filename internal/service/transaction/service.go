@@ -82,15 +82,17 @@ func (s *Service) StartTransaction(ctx context.Context, deviceID string, connect
 	}
 
 	// Publish event
-	event := map[string]interface{}{
-		"transaction_id": tx.ID,
-		"device_id":      deviceID,
-		"user_id":        userID,
-		"start_time":     tx.StartTime.Format(time.RFC3339),
-	}
-	if data, err := json.Marshal(event); err == nil {
-		if err := s.mq.Publish("transaction.started", data); err != nil {
-			s.log.Warn("Failed to publish transaction started event", zap.Error(err))
+	if s.mq != nil {
+		event := map[string]interface{}{
+			"transaction_id": tx.ID,
+			"device_id":      deviceID,
+			"user_id":        userID,
+			"start_time":     tx.StartTime.Format(time.RFC3339),
+		}
+		if data, err := json.Marshal(event); err == nil {
+			if err := s.mq.Publish("transaction.started", data); err != nil {
+				s.log.Warn("Failed to publish transaction started event", zap.Error(err))
+			}
 		}
 	}
 
@@ -136,23 +138,24 @@ func (s *Service) StopTransaction(ctx context.Context, transactionID string) (*d
 		s.log.Warn("Failed to update device status", zap.Error(err))
 	}
 
-	// Publish event for billing
-	event := map[string]interface{}{
-		"transaction_id": tx.ID,
-		"device_id":      tx.ChargePointID,
-		"user_id":        tx.UserID,
-		"total_energy":   tx.TotalEnergy,
-		"cost":           tx.Cost,
-		"currency":       tx.Currency,
-		"end_time":       now.Format(time.RFC3339),
-	}
-	if data, err := json.Marshal(event); err == nil {
-		if err := s.mq.Publish("transaction.completed", data); err != nil {
-			s.log.Warn("Failed to publish transaction completed event", zap.Error(err))
+	// Publish event for billing (if message queue available)
+	if s.mq != nil {
+		event := map[string]interface{}{
+			"transaction_id": tx.ID,
+			"device_id":      tx.ChargePointID,
+			"user_id":        tx.UserID,
+			"total_energy":   tx.TotalEnergy,
+			"cost":           tx.Cost,
+			"currency":       tx.Currency,
+			"end_time":       now.Format(time.RFC3339),
 		}
-		// Also publish to billing
-		if err := s.mq.Publish("billing.events", data); err != nil {
-			s.log.Warn("Failed to publish billing event", zap.Error(err))
+		if data, err := json.Marshal(event); err == nil {
+			if err := s.mq.Publish("transaction.completed", data); err != nil {
+				s.log.Warn("Failed to publish transaction completed event", zap.Error(err))
+			}
+			if err := s.mq.Publish("billing.events", data); err != nil {
+				s.log.Warn("Failed to publish billing event", zap.Error(err))
+			}
 		}
 	}
 

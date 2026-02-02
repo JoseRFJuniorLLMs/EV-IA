@@ -150,9 +150,11 @@ func (s *SmartChargingService) OptimizeCharging(
 	}
 
 	// Publish profile to OCPP (to be sent to the charger)
-	if data, err := json.Marshal(profile); err == nil {
-		if err := s.mq.Publish("ocpp.set_charging_profile", data); err != nil {
-			s.log.Warn("Failed to publish charging profile", zap.Error(err))
+	if s.mq != nil {
+		if data, err := json.Marshal(profile); err == nil {
+			if err := s.mq.Publish("ocpp.set_charging_profile", data); err != nil {
+				s.log.Warn("Failed to publish charging profile", zap.Error(err))
+			}
 		}
 	}
 
@@ -315,14 +317,15 @@ func (s *SmartChargingService) GetChargingProfile(ctx context.Context, deviceID 
 
 // ClearChargingProfile removes a charging profile from a device
 func (s *SmartChargingService) ClearChargingProfile(ctx context.Context, deviceID string, connectorID int) error {
-	clearRequest := map[string]interface{}{
-		"device_id":    deviceID,
-		"connector_id": connectorID,
-	}
-
-	if data, err := json.Marshal(clearRequest); err == nil {
-		if err := s.mq.Publish("ocpp.clear_charging_profile", data); err != nil {
-			return fmt.Errorf("failed to publish clear profile request: %w", err)
+	if s.mq != nil {
+		clearRequest := map[string]interface{}{
+			"device_id":    deviceID,
+			"connector_id": connectorID,
+		}
+		if data, err := json.Marshal(clearRequest); err == nil {
+			if err := s.mq.Publish("ocpp.clear_charging_profile", data); err != nil {
+				return fmt.Errorf("failed to publish clear profile request: %w", err)
+			}
 		}
 	}
 
@@ -379,8 +382,10 @@ func (s *SmartChargingService) LoadBalance(ctx context.Context) error {
 					},
 				}
 
-				if data, err := json.Marshal(profile); err == nil {
-					s.mq.Publish("ocpp.set_charging_profile", data)
+				if s.mq != nil {
+					if data, err := json.Marshal(profile); err == nil {
+						s.mq.Publish("ocpp.set_charging_profile", data)
+					}
 				}
 			}
 		}

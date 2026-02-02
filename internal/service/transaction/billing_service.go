@@ -145,19 +145,20 @@ func (s *BillingService) ProcessPayment(ctx context.Context, tx *domain.Transact
 	}
 
 	// Publish payment event for external processing (e.g., Stripe)
-	paymentEvent := map[string]interface{}{
-		"event_type":     "payment.required",
-		"transaction_id": tx.ID,
-		"user_id":        tx.UserID,
-		"amount":         cost,
-		"currency":       s.pricing.Currency,
-		"energy_kwh":     float64(tx.TotalEnergy) / 1000.0,
-		"timestamp":      time.Now().UTC().Format(time.RFC3339),
-	}
-
-	if data, err := json.Marshal(paymentEvent); err == nil {
-		if err := s.mq.Publish("billing.payment.required", data); err != nil {
-			s.log.Warn("Failed to publish payment event", zap.Error(err))
+	if s.mq != nil {
+		paymentEvent := map[string]interface{}{
+			"event_type":     "payment.required",
+			"transaction_id": tx.ID,
+			"user_id":        tx.UserID,
+			"amount":         cost,
+			"currency":       s.pricing.Currency,
+			"energy_kwh":     float64(tx.TotalEnergy) / 1000.0,
+			"timestamp":      time.Now().UTC().Format(time.RFC3339),
+		}
+		if data, err := json.Marshal(paymentEvent); err == nil {
+			if err := s.mq.Publish("billing.payment.required", data); err != nil {
+				s.log.Warn("Failed to publish payment event", zap.Error(err))
+			}
 		}
 	}
 

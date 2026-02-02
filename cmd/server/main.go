@@ -99,12 +99,14 @@ func main() {
 	}
 	defer redisCache.Close()
 
-	// 6. Initialize Message Queue (NATS)
+	// 6. Initialize Message Queue (NATS) - Optional
 	messageQueue, err := queue.NewNATSQueue(cfg.NATS.URL, logger)
 	if err != nil {
-		logger.Fatal("Failed to connect to NATS", zap.Error(err))
+		logger.Warn("NATS not available, running without message queue", zap.Error(err))
+		messageQueue = nil
+	} else {
+		defer messageQueue.Close()
 	}
-	defer messageQueue.Close()
 
 	// 7. Initialize Repositories
 	chargePointRepo := postgres.NewChargePointRepository(db, logger)
@@ -245,8 +247,10 @@ func main() {
 		}
 	}()
 
-	// 15. Start Background Workers
-	go startBackgroundWorkers(messageQueue, logger)
+	// 15. Start Background Workers (only if NATS available)
+	if messageQueue != nil {
+		go startBackgroundWorkers(messageQueue, logger)
+	}
 
 	// 16. Start HTTP Server
 	go func() {
