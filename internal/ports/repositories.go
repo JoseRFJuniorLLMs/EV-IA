@@ -27,7 +27,6 @@ type UserRepository interface {
 	Save(ctx context.Context, user *domain.User) error
 	FindByID(ctx context.Context, id string) (*domain.User, error)
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
-	FindByPhone(ctx context.Context, phone string) (*domain.User, error)
 }
 
 // PaymentRepository handles payment persistence
@@ -94,12 +93,4 @@ type Alert struct {
 	SourceID     string
 	Acknowledged bool
 	CreatedAt    time.Time
-}
-
-// TripRepository handles trip persistence
-type TripRepository interface {
-	Save(ctx context.Context, trip *domain.Trip) error
-	GetByID(ctx context.Context, id string) (*domain.Trip, error)
-	GetByUserID(ctx context.Context, userID string, status string, limit, offset int) ([]domain.Trip, error)
-	Delete(ctx context.Context, id string) error
 }
