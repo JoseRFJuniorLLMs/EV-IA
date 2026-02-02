@@ -34,15 +34,12 @@ func NewConnection(url string, log *zap.Logger) (*gorm.DB, error) {
 	return db, nil
 }
 
-// RunMigrations runs auto-migration for defined models
+// RunMigrations - migrations are managed via SQL files in migrations/
+// AutoMigrate is disabled to prevent conflicts with existing schema
 func RunMigrations(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&domain.User{},
-		&domain.ChargePoint{},
-		&domain.Connector{},
-		&domain.Location{},
-		&domain.Transaction{},
-	)
+	// Tables already exist from SQL migrations (001_initial_schema.sql, 002_v2g_tables.sql)
+	// Skip GORM AutoMigrate to avoid constraint conflicts
+	return nil
 }
 
 // Helper to close connection if needed (though *gorm.DB doesn't have Close directly, sql.DB does)
