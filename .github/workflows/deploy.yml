@@ -6,35 +6,17 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: '1.22'
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  GCP_PROJECT: malaria-487614
-  GCP_ZONE: africa-south1-a
-  VM_NAME: malaria-vm
+  GO_VERSION: '1.24'
+  VM_IP: ${{ secrets.VM_IP }}
   VM_USER: web2a
-  DEPLOY_DIR: /home/web2a/sigec-ve
-
-permissions:
-  contents: read
-  packages: write
 
 jobs:
-  build-and-push:
-    name: Build Docker Image
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
-      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: |
-          VERSION=$(git describe --tags --always 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -48,143 +30,92 @@ jobs:
                    ./internal/service/device/... \
                    ./internal/service/transaction/... \
                    -v -count=1
-        continue-on-error: false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          build-args: |
-            VERSION=${{ steps.version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy-vm:
+  deploy:
     name: Deploy to VM
     runs-on: ubuntu-latest
-    needs: build-and-push
-    environment:
-      name: production
-      url: http://34.35.36.178:8082
+    needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.GCP_PROJECT }}
-
-      - name: Deploy to VM
+      - name: Setup SSH key
         run: |
-          gcloud compute ssh ${{ env.VM_NAME }} \
-            --zone=${{ env.GCP_ZONE }} \
-            --project=${{ env.GCP_PROJECT }} \
-            --command="
-              set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.VM_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+          echo "Host *
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking accept-new" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
-              # Create deploy directory
-              mkdir -p ${{ env.DEPLOY_DIR }}
-              cd ${{ env.DEPLOY_DIR }}
+      - name: Upload source and build on VM
+        run: |
+          # Archive source (exclude .git)
+          tar czf /tmp/ev-ia.tar.gz --exclude='.git' --exclude='frontend' --exclude='node_modules' .
 
-              # Login to GHCR
-              echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          # Upload to VM
+          ssh ${{ env.VM_USER }}@${{ env.VM_IP }} "rm -rf /tmp/ev-ia-src && mkdir -p /tmp/ev-ia-src"
+          scp /tmp/ev-ia.tar.gz ${{ env.VM_USER }}@${{ env.VM_IP }}:/tmp/ev-ia.tar.gz
 
-              # Pull latest image
-              docker pull ghcr.io/${{ github.repository }}:latest
+          # Build Docker image and restart container on VM
+          ssh ${{ env.VM_USER }}@${{ env.VM_IP }} '
+            set -e
 
-              # Stop old container (ignore if not running)
-              docker stop sigec-api 2>/dev/null || true
-              docker rm sigec-api 2>/dev/null || true
+            cd /tmp/ev-ia-src
+            tar xzf /tmp/ev-ia.tar.gz
 
-              # Start new container
-              docker run -d \
-                --name sigec-api \
-                --restart unless-stopped \
-                --network host \
-                -e HTTP_PORT=8082 \
-                -e DATABASE_URL='postgres://sigec:SigecVE2026@localhost:5433/sigec_ve?sslmode=disable' \
-                -e REDIS_URL='redis://localhost:6379/1' \
-                -e NATS_URL='' \
-                -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
-                -e GEMINI_API_KEY='${{ secrets.GEMINI_API_KEY }}' \
-                -e STRIPE_SECRET_KEY='${{ secrets.STRIPE_SECRET_KEY }}' \
-                -e APP_ENVIRONMENT=production \
-                -e LOG_LEVEL=info \
-                -p 8082:8082 \
-                -p 9000:9000 \
-                -p 50051:50051 \
-                ghcr.io/${{ github.repository }}:latest
+            echo "Building Docker image..."
+            sudo docker build -t ev-ia:latest .
 
-              # Ensure PostgreSQL container exists
-              if ! docker ps --format '{{.Names}}' | grep -q sigec-postgres; then
-                docker run -d \
-                  --name sigec-postgres \
-                  --restart unless-stopped \
-                  -e POSTGRES_USER=sigec \
-                  -e POSTGRES_PASSWORD=SigecVE2026 \
-                  -e POSTGRES_DB=sigec_ve \
-                  -p 5433:5432 \
-                  -v sigec_pg_data:/var/lib/postgresql/data \
-                  postgres:16-alpine
-              fi
+            echo "Stopping old container..."
+            sudo docker stop ev-ia 2>/dev/null || true
+            sudo docker rm ev-ia 2>/dev/null || true
 
-              # Cleanup old images
-              docker image prune -f
+            echo "Starting new container..."
+            sudo docker run -d \
+              --name ev-ia \
+              --restart unless-stopped \
+              --network host \
+              -e HTTP_PORT=8083 \
+              -e APP_GRPC_PORT=50053 \
+              -e APP_OCPP_PORT=9001 \
+              -e DATABASE_URL="postgres://postgres:Debian23%40@localhost:5432/ev-db?sslmode=disable" \
+              -e REDIS_URL="redis://localhost:6379/0" \
+              -e NATS_URL="" \
+              -e JWT_SECRET="'"${{ secrets.JWT_SECRET }}"'" \
+              -e GEMINI_API_KEY="'"${{ secrets.GEMINI_API_KEY }}"'" \
+              -e STRIPE_SECRET_KEY="'"${{ secrets.STRIPE_SECRET_KEY }}"'" \
+              -e APP_ENVIRONMENT=production \
+              -e LOG_LEVEL=info \
+              -e APP_SECURITY_ENABLE_HTTPS=false \
+              -e APP_SECURITY_ENABLE_MTLS=false \
+              ev-ia:latest
 
-              echo 'Deploy complete!'
-            "
+            # Cleanup
+            sudo docker image prune -f
+            rm -rf /tmp/ev-ia-src /tmp/ev-ia.tar.gz
+
+            echo "Deploy complete!"
+          '
 
       - name: Health check
         run: |
           echo "Waiting for service to start..."
-          sleep 15
-          for i in $(seq 1 12); do
-            if gcloud compute ssh ${{ env.VM_NAME }} \
-              --zone=${{ env.GCP_ZONE }} \
-              --project=${{ env.GCP_PROJECT }} \
-              --command="curl -sf http://localhost:8082/health/live" 2>/dev/null; then
-              echo "Health check passed!"
+          sleep 10
+          for i in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 https://${{ env.VM_IP }}/ev-api/v1/auth/register || echo "000")
+            echo "Attempt $i: HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" != "000" ]; then
+              echo "EV-IA backend is responding"
               exit 0
             fi
-            echo "Attempt $i/12 - waiting..."
-            sleep 10
+            sleep 5
           done
           echo "Health check failed"
           exit 1
 
-      - name: Show deploy info
+      - name: Notify
         if: always()
-        run: |
-          echo "## Deploy Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **VM:** ${{ env.VM_NAME }} (34.35.36.178)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** ghcr.io/${{ github.repository }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo "- **API:** http://34.35.36.178:8082" >> $GITHUB_STEP_SUMMARY
-          echo "- **OCPP:** ws://34.35.36.178:9000" >> $GITHUB_STEP_SUMMARY
-          echo "- **gRPC:** 34.35.36.178:50051" >> $GITHUB_STEP_SUMMARY
+        run: echo "EV-IA deploy ${{ job.status }} - commit ${{ github.sha }}"

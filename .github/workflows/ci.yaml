@@ -11,17 +11,7 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-      - 'release/**'
-    tags:
-      - 'v*.*.*'
-  pull_request:
-    branches:
-      - main
-      - develop
+  workflow_dispatch:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}

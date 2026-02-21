@@ -202,6 +202,9 @@ func main() {
 	// Protected routes
 	protected := v1.Group("", middleware.AuthRequired(authService))
 
+	// Auth protected routes
+	protected.Get("/auth/me", authHandler.Me)
+
 	// Device routes (nearby MUST come before :id to avoid matching "nearby" as id param)
 	deviceHandler := handlers.NewDeviceHandler(deviceService, logger)
 	protected.Get("/devices", deviceHandler.List)
