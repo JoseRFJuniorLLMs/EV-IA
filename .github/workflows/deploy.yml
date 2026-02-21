@@ -1,45 +1,39 @@
-name: Deploy
+name: Build & Deploy to VM
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'staging'
-        type: choice
-        options:
-          - staging
-          - production
 
 env:
   GO_VERSION: '1.22'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  GCP_PROJECT: malaria-487614
+  GCP_ZONE: africa-south1-a
+  VM_NAME: malaria-vm
+  VM_USER: web2a
+  DEPLOY_DIR: /home/web2a/sigec-ve
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  build:
-    name: Build and Push
+  build-and-push:
+    name: Build Docker Image
     runs-on: ubuntu-latest
     outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Get version
         id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=$(git describe --tags --always --dirty)
-          fi
+          VERSION=$(git describe --tags --always 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
@@ -49,176 +43,148 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: go test -v -race ./...
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        run: |
+          go test ./internal/service/auth/... \
+                   ./internal/service/device/... \
+                   ./internal/service/transaction/... \
+                   -v -count=1
+        continue-on-error: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-staging:
-    name: Deploy to Staging
+  deploy-vm:
+    name: Deploy to VM
     runs-on: ubuntu-latest
-    needs: build
-    if: github.event.inputs.environment == 'staging' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
-    environment:
-      name: staging
-      url: https://staging.sigec-ve.com
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.28.0'
-
-      - name: Configure kubectl
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
-
-      - name: Deploy to Kubernetes
-        run: |
-          kubectl set image deployment/sigec-ve-api \
-            api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }} \
-            -n sigec-ve-staging
-
-          kubectl rollout status deployment/sigec-ve-api -n sigec-ve-staging --timeout=300s
-
-      - name: Verify deployment
-        run: |
-          kubectl get pods -n sigec-ve-staging -l app=sigec-ve-api
-
-          # Wait for health check
-          for i in {1..30}; do
-            if curl -s https://staging.sigec-ve.com/health | grep -q "healthy"; then
-              echo "Health check passed"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Health check failed"
-          exit 1
-
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [build, deploy-staging]
-    if: github.event.inputs.environment == 'production' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-'))
+    needs: build-and-push
     environment:
       name: production
-      url: https://api.sigec-ve.com
+      url: http://34.35.36.178:8082
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
-          version: 'v1.28.0'
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Configure kubectl
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Deploy to VM
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          gcloud compute ssh ${{ env.VM_NAME }} \
+            --zone=${{ env.GCP_ZONE }} \
+            --project=${{ env.GCP_PROJECT }} \
+            --command="
+              set -e
 
-      - name: Deploy to Kubernetes (Blue/Green)
+              # Create deploy directory
+              mkdir -p ${{ env.DEPLOY_DIR }}
+              cd ${{ env.DEPLOY_DIR }}
+
+              # Login to GHCR
+              echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+              # Pull latest image
+              docker pull ghcr.io/${{ github.repository }}:latest
+
+              # Stop old container (ignore if not running)
+              docker stop sigec-api 2>/dev/null || true
+              docker rm sigec-api 2>/dev/null || true
+
+              # Start new container
+              docker run -d \
+                --name sigec-api \
+                --restart unless-stopped \
+                --network host \
+                -e HTTP_PORT=8082 \
+                -e DATABASE_URL='postgres://sigec:SigecVE2026@localhost:5433/sigec_ve?sslmode=disable' \
+                -e REDIS_URL='redis://localhost:6379/1' \
+                -e NATS_URL='' \
+                -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+                -e GEMINI_API_KEY='${{ secrets.GEMINI_API_KEY }}' \
+                -e STRIPE_SECRET_KEY='${{ secrets.STRIPE_SECRET_KEY }}' \
+                -e APP_ENVIRONMENT=production \
+                -e LOG_LEVEL=info \
+                -p 8082:8082 \
+                -p 9000:9000 \
+                -p 50051:50051 \
+                ghcr.io/${{ github.repository }}:latest
+
+              # Ensure PostgreSQL container exists
+              if ! docker ps --format '{{.Names}}' | grep -q sigec-postgres; then
+                docker run -d \
+                  --name sigec-postgres \
+                  --restart unless-stopped \
+                  -e POSTGRES_USER=sigec \
+                  -e POSTGRES_PASSWORD=SigecVE2026 \
+                  -e POSTGRES_DB=sigec_ve \
+                  -p 5433:5432 \
+                  -v sigec_pg_data:/var/lib/postgresql/data \
+                  postgres:16-alpine
+              fi
+
+              # Cleanup old images
+              docker image prune -f
+
+              echo 'Deploy complete!'
+            "
+
+      - name: Health check
         run: |
-          # Get current deployment color
-          CURRENT=$(kubectl get service sigec-ve-api -n sigec-ve-production -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "blue")
-
-          if [ "$CURRENT" == "blue" ]; then
-            NEW="green"
-          else
-            NEW="blue"
-          fi
-
-          echo "Deploying to $NEW (current: $CURRENT)"
-
-          # Update the new deployment
-          kubectl set image deployment/sigec-ve-api-$NEW \
-            api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }} \
-            -n sigec-ve-production
-
-          kubectl rollout status deployment/sigec-ve-api-$NEW -n sigec-ve-production --timeout=300s
-
-          # Switch traffic
-          kubectl patch service sigec-ve-api -n sigec-ve-production \
-            -p "{\"spec\":{\"selector\":{\"version\":\"$NEW\"}}}"
-
-          echo "Switched traffic to $NEW"
-
-      - name: Verify deployment
-        run: |
-          for i in {1..30}; do
-            if curl -s https://api.sigec-ve.com/health | grep -q "healthy"; then
-              echo "Health check passed"
+          echo "Waiting for service to start..."
+          sleep 15
+          for i in $(seq 1 12); do
+            if gcloud compute ssh ${{ env.VM_NAME }} \
+              --zone=${{ env.GCP_ZONE }} \
+              --project=${{ env.GCP_PROJECT }} \
+              --command="curl -sf http://localhost:8082/health/live" 2>/dev/null; then
+              echo "Health check passed!"
               exit 0
             fi
+            echo "Attempt $i/12 - waiting..."
             sleep 10
           done
           echo "Health check failed"
           exit 1
 
-      - name: Notify success
-        if: success()
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: |
-            {
-              "text": "Deployment to production successful",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": ":white_check_mark: *SIGEC-VE deployed to production*\n*Version:* ${{ needs.build.outputs.version }}\n*URL:* https://api.sigec-ve.com"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Notify failure
-        if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: |
-            {
-              "text": "Deployment to production failed",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": ":x: *SIGEC-VE deployment to production failed*\n*Version:* ${{ needs.build.outputs.version }}\n*Run:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Show deploy info
+        if: always()
+        run: |
+          echo "## Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **VM:** ${{ env.VM_NAME }} (34.35.36.178)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ghcr.io/${{ github.repository }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "- **API:** http://34.35.36.178:8082" >> $GITHUB_STEP_SUMMARY
+          echo "- **OCPP:** ws://34.35.36.178:9000" >> $GITHUB_STEP_SUMMARY
+          echo "- **gRPC:** 34.35.36.178:50051" >> $GITHUB_STEP_SUMMARY

@@ -35,8 +35,8 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/server /app/server
 
-# Copy configuration files if needed
-# COPY --from=builder /app/config /app/config
+# Copy configuration files
+COPY --from=builder /app/configs /app/configs
 
 # Change ownership
 RUN chown -R sigec:sigec /app
@@ -45,11 +45,11 @@ RUN chown -R sigec:sigec /app
 USER sigec
 
 # Expose ports
-EXPOSE 8080 8081 9000 50051
+EXPOSE 8080 8082 9000 50051
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# Health check (uses HTTP_PORT env var, defaults to 8080)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${HTTP_PORT:-8080}/health/live || exit 1
 
 # Run the server
 ENTRYPOINT ["/app/server"]

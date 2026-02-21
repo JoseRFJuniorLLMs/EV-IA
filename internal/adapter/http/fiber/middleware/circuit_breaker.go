@@ -76,14 +76,24 @@ func CircuitBreakerWithConfig(cfg CircuitBreakerConfig) fiber.Handler {
 			return nil, c.Next()
 		})
 
-		if err == gobreaker.ErrOpenState {
-			log.Warn("Circuit breaker open, rejecting request",
+		if err == gobreaker.ErrOpenState || err == gobreaker.ErrTooManyRequests {
+			log.Warn("Circuit breaker rejecting request",
 				zap.String("path", c.Path()),
 				zap.String("method", c.Method()),
+				zap.String("state", cb.State().String()),
+				zap.Error(err),
 			)
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"error": "Service temporarily unavailable",
 			})
+		}
+
+		if err != nil {
+			log.Error("Request failed through circuit breaker",
+				zap.String("path", c.Path()),
+				zap.String("method", c.Method()),
+				zap.Error(err),
+			)
 		}
 
 		return err

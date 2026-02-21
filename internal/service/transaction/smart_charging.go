@@ -67,11 +67,12 @@ func DefaultSmartChargingConfig() *SmartChargingConfig {
 
 // SmartChargingService handles intelligent charging optimization
 type SmartChargingService struct {
-	deviceRepo ports.ChargePointRepository
-	txRepo     ports.TransactionRepository
-	mq         queue.MessageQueue
-	config     *SmartChargingConfig
-	log        *zap.Logger
+	deviceRepo     ports.ChargePointRepository
+	txRepo         ports.TransactionRepository
+	mq             queue.MessageQueue
+	config         *SmartChargingConfig
+	activeProfiles map[string]*ChargingProfile // key: "deviceID:connectorID"
+	log            *zap.Logger
 }
 
 // NewSmartChargingService creates a new smart charging service
@@ -86,11 +87,12 @@ func NewSmartChargingService(
 		config = DefaultSmartChargingConfig()
 	}
 	return &SmartChargingService{
-		deviceRepo: deviceRepo,
-		txRepo:     txRepo,
-		mq:         mq,
-		config:     config,
-		log:        log,
+		deviceRepo:     deviceRepo,
+		txRepo:         txRepo,
+		mq:             mq,
+		config:         config,
+		activeProfiles: make(map[string]*ChargingProfile),
+		log:            log,
 	}
 }
 
@@ -157,6 +159,10 @@ func (s *SmartChargingService) OptimizeCharging(
 			}
 		}
 	}
+
+	// Store active profile
+	profileKey := fmt.Sprintf("%s:%d", deviceID, connectorID)
+	s.activeProfiles[profileKey] = profile
 
 	s.log.Info("Created optimized charging profile",
 		zap.String("profile_id", profile.ProfileID),
@@ -303,20 +309,62 @@ func (s *SmartChargingService) createPeakShavingSchedule(
 
 // GetChargingProfile retrieves the current charging profile for a device
 func (s *SmartChargingService) GetChargingProfile(ctx context.Context, deviceID string, connectorID int) (*ChargingProfile, error) {
-	// In a real implementation, this would query the OCPP server or database
-	// for the current active profile
-
 	s.log.Info("Getting charging profile",
 		zap.String("device_id", deviceID),
 		zap.Int("connector_id", connectorID),
 	)
 
-	// Return nil if no profile is set (charger uses default)
-	return nil, nil
+	// Check for an active profile in memory
+	profileKey := fmt.Sprintf("%s:%d", deviceID, connectorID)
+	if profile, ok := s.activeProfiles[profileKey]; ok {
+		// Check if profile has expired
+		if profile.ValidTo != nil && profile.ValidTo.Before(time.Now()) {
+			delete(s.activeProfiles, profileKey)
+		} else {
+			return profile, nil
+		}
+	}
+
+	// No custom profile — return a default profile based on connector max power
+	device, err := s.deviceRepo.FindByID(ctx, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device: %w", err)
+	}
+	if device == nil {
+		return nil, errors.New("device not found")
+	}
+
+	var maxPowerKW float64 = s.config.DefaultMaxPowerKW
+	for _, conn := range device.Connectors {
+		if conn.ConnectorID == connectorID {
+			maxPowerKW = conn.MaxPowerKW
+			break
+		}
+	}
+
+	now := time.Now()
+	return &ChargingProfile{
+		ProfileID:      fmt.Sprintf("DEFAULT-%s-%d", deviceID[:8], connectorID),
+		DeviceID:       deviceID,
+		ConnectorID:    connectorID,
+		ProfilePurpose: "ChargePointMaxProfile",
+		StackLevel:     0,
+		ChargingSchedule: &ChargingSchedule{
+			ChargingRateUnit: "W",
+			ChargingSchedulePeriods: []ChargingSchedulePeriod{
+				{StartPeriod: 0, Limit: maxPowerKW * 1000, NumberPhases: 3},
+			},
+		},
+		ValidFrom: &now,
+	}, nil
 }
 
 // ClearChargingProfile removes a charging profile from a device
 func (s *SmartChargingService) ClearChargingProfile(ctx context.Context, deviceID string, connectorID int) error {
+	// Remove from in-memory store
+	profileKey := fmt.Sprintf("%s:%d", deviceID, connectorID)
+	delete(s.activeProfiles, profileKey)
+
 	if s.mq != nil {
 		clearRequest := map[string]interface{}{
 			"device_id":    deviceID,

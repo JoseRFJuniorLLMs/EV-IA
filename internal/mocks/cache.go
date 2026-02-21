@@ -2,17 +2,18 @@ package mocks
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
 // MockCache is a mock implementation of Cache interface
 type MockCache struct {
-	data     map[string]string
-	GetFunc  func(ctx context.Context, key string) (string, error)
-	SetFunc  func(ctx context.Context, key string, value string, expiration time.Duration) error
+	data       map[string]string
+	GetFunc    func(ctx context.Context, key string) (string, error)
+	SetFunc    func(ctx context.Context, key string, value interface{}, expiration time.Duration) error
 	DeleteFunc func(ctx context.Context, key string) error
-	PingFunc func() error
-	CloseFunc func() error
+	PingFunc   func() error
+	CloseFunc  func() error
 }
 
 func NewMockCache() *MockCache {
@@ -31,11 +32,11 @@ func (m *MockCache) Get(ctx context.Context, key string) (string, error) {
 	return "", nil
 }
 
-func (m *MockCache) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
+func (m *MockCache) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
 	if m.SetFunc != nil {
 		return m.SetFunc(ctx, key, value, expiration)
 	}
-	m.data[key] = value
+	m.data[key] = fmt.Sprintf("%v", value)
 	return nil
 }
 

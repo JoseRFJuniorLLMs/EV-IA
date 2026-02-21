@@ -99,11 +99,11 @@ func (r *ChargePointRepository) FindNearby(ctx context.Context, lat, lon, radius
 	`
 
 	// Execute raw SQL with Haversine formula
-	// Parameters: lat (3x for formula), lon (2x), radius, lat (2x for ORDER BY), lon
+	// Parameters per formula instance: lat (for Δlat), lat (for cos(φ₁)), lon (for Δlon)
 	result := r.db.WithContext(ctx).Raw(
 		haversineSQL,
-		lat, lat, lon, radius, // WHERE clause
-		lat, lat, lon,         // ORDER BY clause
+		lat, lat, lon, radius, // WHERE clause: sin²(Δlat/2), cos(input_lat), sin²(Δlon/2), max_distance
+		lat, lat, lon,         // ORDER BY clause: same formula for sorting
 	).Scan(&cps)
 
 	if result.Error != nil {

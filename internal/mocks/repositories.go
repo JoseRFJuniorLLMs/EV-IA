@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"context"
+	"time"
 
 	"github.com/seu-repo/sigec-ve/internal/domain"
 )
@@ -80,11 +81,12 @@ func (m *MockChargePointRepository) FindNearby(ctx context.Context, lat, lon, ra
 
 // MockTransactionRepository is a mock implementation of TransactionRepository
 type MockTransactionRepository struct {
-	SaveFunc              func(ctx context.Context, tx *domain.Transaction) error
-	FindByIDFunc          func(ctx context.Context, id string) (*domain.Transaction, error)
-	FindActiveByUserIDFunc func(ctx context.Context, userID string) (*domain.Transaction, error)
+	SaveFunc                func(ctx context.Context, tx *domain.Transaction) error
+	FindByIDFunc            func(ctx context.Context, id string) (*domain.Transaction, error)
+	FindActiveByUserIDFunc  func(ctx context.Context, userID string) (*domain.Transaction, error)
 	FindHistoryByUserIDFunc func(ctx context.Context, userID string) ([]domain.Transaction, error)
-	UpdateFunc            func(ctx context.Context, tx *domain.Transaction) error
+	FindByDateFunc          func(ctx context.Context, date time.Time) ([]domain.Transaction, error)
+	UpdateFunc              func(ctx context.Context, tx *domain.Transaction) error
 }
 
 func (m *MockTransactionRepository) Save(ctx context.Context, tx *domain.Transaction) error {
@@ -111,6 +113,13 @@ func (m *MockTransactionRepository) FindActiveByUserID(ctx context.Context, user
 func (m *MockTransactionRepository) FindHistoryByUserID(ctx context.Context, userID string) ([]domain.Transaction, error) {
 	if m.FindHistoryByUserIDFunc != nil {
 		return m.FindHistoryByUserIDFunc(ctx, userID)
+	}
+	return []domain.Transaction{}, nil
+}
+
+func (m *MockTransactionRepository) FindByDate(ctx context.Context, date time.Time) ([]domain.Transaction, error) {
+	if m.FindByDateFunc != nil {
+		return m.FindByDateFunc(ctx, date)
 	}
 	return []domain.Transaction{}, nil
 }

@@ -1,0 +1,73 @@
+version: '3.9'
+
+# ============================================
+# SIGEC-VE Enterprise - VM Production Deploy
+# VM: malaria-vm (34.35.36.178)
+# ============================================
+# Port 8080 is taken by Malaria API, so we use 8082
+# Redis is shared with EVA-Mind (already running on host)
+
+services:
+  sigec-api:
+    image: ghcr.io/joserfjuniorlllms/ev-ia:latest
+    container_name: sigec-api
+    restart: unless-stopped
+    ports:
+      - "8082:8082"   # REST API (8080 taken by Malaria)
+      - "9000:9000"   # OCPP WebSocket
+      - "50051:50051"  # gRPC
+    environment:
+      - APP_ENVIRONMENT=production
+      - HTTP_PORT=8082
+      - DATABASE_URL=postgres://sigec:SigecVE2026@sigec-postgres:5432/sigec_ve?sslmode=disable
+      - REDIS_URL=redis://redis:6379/1
+      - NATS_URL=
+      - JWT_SECRET=${JWT_SECRET:-sigec-ve-production-secret-2026}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - LOG_LEVEL=info
+    volumes:
+      - ./configs:/app/configs:ro
+      - sigec_logs:/app/logs
+    depends_on:
+      sigec-postgres:
+        condition: service_healthy
+    networks:
+      - sigec-net
+      - default
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  sigec-postgres:
+    image: postgres:16-alpine
+    container_name: sigec-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"  # 5432 may conflict, expose on 5433
+    environment:
+      - POSTGRES_USER=sigec
+      - POSTGRES_PASSWORD=SigecVE2026
+      - POSTGRES_DB=sigec_ve
+    volumes:
+      - sigec_pg_data:/var/lib/postgresql/data
+    networks:
+      - sigec-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sigec -d sigec_ve"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sigec_pg_data:
+    driver: local
+  sigec_logs:
+    driver: local
+
+networks:
+  sigec-net:
+    driver: bridge

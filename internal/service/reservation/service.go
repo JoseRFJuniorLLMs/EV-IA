@@ -431,15 +431,40 @@ func (s *Service) ProcessExpiredReservations(ctx context.Context) error {
 
 // GetReservationSummary returns reservation statistics
 func (s *Service) GetReservationSummary(ctx context.Context, chargePointID string, startDate, endDate time.Time) (*domain.ReservationSummary, error) {
-	// This would typically be a database aggregation query
-	// For now, return a placeholder
-	return &domain.ReservationSummary{
-		TotalReservations:     0,
-		PendingReservations:   0,
-		CompletedReservations: 0,
-		CancelledReservations: 0,
-		NoShowCount:           0,
-		TotalRevenue:          0,
-		AverageDuration:       0,
-	}, nil
+	// Query reservations for the charge point within the date range
+	reservations, err := s.repo.GetByChargePointID(ctx, chargePointID, startDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reservations: %w", err)
+	}
+
+	summary := &domain.ReservationSummary{}
+	var totalDurationMinutes float64
+
+	for _, r := range reservations {
+		// Filter by date range
+		if r.StartTime.Before(startDate) || r.StartTime.After(endDate) {
+			continue
+		}
+
+		summary.TotalReservations++
+		summary.TotalRevenue += r.Fee
+
+		switch r.Status {
+		case domain.ReservationStatusPending, domain.ReservationStatusConfirmed:
+			summary.PendingReservations++
+		case domain.ReservationStatusCompleted:
+			summary.CompletedReservations++
+			totalDurationMinutes += float64(r.Duration)
+		case domain.ReservationStatusCancelled:
+			summary.CancelledReservations++
+		case domain.ReservationStatusNoShow:
+			summary.NoShowCount++
+		}
+	}
+
+	if summary.CompletedReservations > 0 {
+		summary.AverageDuration = totalDurationMinutes / float64(summary.CompletedReservations)
+	}
+
+	return summary, nil
 }

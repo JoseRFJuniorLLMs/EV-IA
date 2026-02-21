@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -23,7 +24,9 @@ import (
 	// Internal packages
 	"github.com/seu-repo/sigec-ve/internal/adapter/ai/gemini"
 	"github.com/seu-repo/sigec-ve/internal/adapter/cache"
+	payment "github.com/seu-repo/sigec-ve/internal/adapter/external/payment"
 	"github.com/seu-repo/sigec-ve/internal/adapter/grpc/server"
+	"github.com/seu-repo/sigec-ve/internal/ports"
 	"github.com/seu-repo/sigec-ve/internal/adapter/http/fiber/handlers"
 	"github.com/seu-repo/sigec-ve/internal/adapter/http/fiber/middleware"
 	v201 "github.com/seu-repo/sigec-ve/internal/adapter/ocpp/v201"
@@ -113,10 +116,15 @@ func main() {
 	transactionRepo := postgres.NewTransactionRepository(db, logger)
 	userRepo := postgres.NewUserRepository(db, logger)
 
-	// 8. Initialize Services (Business Logic Layer)
+	// 8. Initialize Payment Gateway (Stripe)
+	stripeGateway := payment.NewStripeService(cfg.Payment.Stripe.SecretKey, logger)
+
+	// 9. Initialize Services (Business Logic Layer)
 	authService := auth.NewService(userRepo, redisCache, cfg.JWT.Secret, logger)
 	deviceService := device.NewService(chargePointRepo, redisCache, messageQueue, logger)
 	transactionService := transaction.NewService(transactionRepo, deviceService, messageQueue, logger)
+	billingService := transaction.NewBillingService(transactionRepo, messageQueue, transaction.DefaultPricingConfig(), logger)
+
 
 	// 9. Initialize Gemini Live API Client (Voice)
 	geminiClient := gemini.NewLiveClient(cfg.Gemini.APIKey, logger)
@@ -155,7 +163,7 @@ func main() {
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 	app.Use(middleware.RateLimit())
-	app.Use(middleware.CircuitBreaker())
+	app.Use(middleware.CircuitBreakerWithLogger(logger))
 	// app.Use(middleware.RequestID()) // Assuming this exists or uses fiber's
 	// app.Use(telemetry.HTTPMiddleware()) // Assuming this exists
 
@@ -194,11 +202,11 @@ func main() {
 	// Protected routes
 	protected := v1.Group("", middleware.AuthRequired(authService))
 
-	// Device routes
+	// Device routes (nearby MUST come before :id to avoid matching "nearby" as id param)
 	deviceHandler := handlers.NewDeviceHandler(deviceService, logger)
 	protected.Get("/devices", deviceHandler.List)
-	protected.Get("/devices/:id", deviceHandler.Get)
 	protected.Get("/devices/nearby", deviceHandler.GetNearby)
+	protected.Get("/devices/:id", deviceHandler.Get)
 	protected.Patch("/devices/:id/status", deviceHandler.UpdateStatus)
 
 	// Transaction routes
@@ -249,7 +257,7 @@ func main() {
 
 	// 15. Start Background Workers (only if NATS available)
 	if messageQueue != nil {
-		go startBackgroundWorkers(messageQueue, logger)
+		go startBackgroundWorkers(messageQueue, billingService, stripeGateway, transactionRepo, logger)
 	}
 
 	// 16. Start HTTP Server
@@ -280,27 +288,52 @@ func main() {
 }
 
 // startBackgroundWorkers starts async jobs like billing, analytics, etc.
-func startBackgroundWorkers(mq queue.MessageQueue, logger *zap.Logger) {
+func startBackgroundWorkers(mq queue.MessageQueue, billing *transaction.BillingService, pg ports.PaymentGateway, txRepo ports.TransactionRepository, logger *zap.Logger) {
 	logger.Info("Starting background workers")
 
-	// Worker 1: Process billing events
+	// Worker 1: Process billing payment events
+	mq.Subscribe("billing.payment.required", func(msg []byte) error {
+		logger.Info("Processing billing payment event", zap.ByteString("msg", msg))
+
+		var event struct {
+			TransactionID string  `json:"transaction_id"`
+			UserID        string  `json:"user_id"`
+			Amount        float64 `json:"amount"`
+			Currency      string  `json:"currency"`
+		}
+		if err := json.Unmarshal(msg, &event); err != nil {
+			logger.Error("Failed to unmarshal billing event", zap.Error(err))
+			return err
+		}
+
+		// Create payment intent via Stripe
+		piID, err := pg.CreatePaymentIntent(context.Background(), event.Amount, event.Currency, event.UserID)
+		if err != nil {
+			logger.Error("Failed to create payment intent", zap.Error(err), zap.String("tx_id", event.TransactionID))
+			return err
+		}
+		logger.Info("Payment intent created for transaction",
+			zap.String("tx_id", event.TransactionID),
+			zap.String("payment_intent_id", piID),
+		)
+		return nil
+	})
+
+	// Worker 2: Process general billing events
 	mq.Subscribe("billing.events", func(msg []byte) error {
 		logger.Info("Processing billing event", zap.ByteString("msg", msg))
-		// Process billing logic
 		return nil
 	})
 
-	// Worker 2: Send notifications
+	// Worker 3: Send notifications
 	mq.Subscribe("notifications.events", func(msg []byte) error {
 		logger.Info("Sending notification", zap.ByteString("msg", msg))
-		// Send email/SMS/push
 		return nil
 	})
 
-	// Worker 3: Analytics aggregation
+	// Worker 4: Analytics aggregation
 	ticker := time.NewTicker(5 * time.Minute)
 	for range ticker.C {
 		logger.Info("Running analytics aggregation")
-		// Aggregate metrics
 	}
 }
