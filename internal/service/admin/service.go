@@ -372,7 +372,7 @@ func (s *Service) GetStationDetails(ctx context.Context, stationID string) (*por
 		return nil, fmt.Errorf("station not found")
 	}
 
-	lastSeen := station.LastSeen
+	lastSeen := station.LastHeartbeat
 	details := &ports.StationDetails{
 		Station:       station,
 		Connectors:    station.Connectors,
@@ -393,7 +393,7 @@ func (s *Service) GetStationDetails(ctx context.Context, stationID string) (*por
 	}
 
 	// Uptime: if station was seen within last 5 min, consider it up
-	if time.Since(station.LastSeen) < 5*time.Minute {
+	if time.Since(station.LastHeartbeat) < 5*time.Minute {
 		details.Uptime = 100.0
 	} else if station.Status == domain.ChargePointStatusAvailable || station.Status == domain.ChargePointStatusOccupied {
 		details.Uptime = 95.0

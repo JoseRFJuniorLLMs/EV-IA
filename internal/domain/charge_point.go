@@ -24,13 +24,13 @@ type ChargePoint struct {
 	LocationID      string            `json:"location_id"`
 	Location        *Location         `json:"location,omitempty" gorm:"foreignKey:LocationID"`
 	Connectors      []Connector       `json:"connectors" gorm:"foreignKey:ChargePointID"`
-	LastSeen        time.Time         `json:"last_seen"`
+	LastHeartbeat   time.Time         `json:"last_heartbeat" gorm:"column:last_heartbeat"`
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`
 }
 
 type Connector struct {
-	ID            uint              `json:"id" gorm:"primaryKey"`
+	ID            string            `json:"id" gorm:"primaryKey"`
 	ChargePointID string            `json:"charge_point_id" gorm:"index"` // Foreign key
 	ConnectorID   int               `json:"connector_id"`                 // The standard 1-based connector ID
 	Type          string            `json:"type"`                         // e.g., CCS, CHAdeMO, Type2
