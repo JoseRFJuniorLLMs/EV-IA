@@ -40,9 +40,11 @@ type Connector struct {
 
 type Location struct {
 	ID        string  `json:"id" gorm:"primaryKey"`
+	Name      string  `json:"name"`
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 	Address   string  `json:"address"`
 	City      string  `json:"city"`
+	State     string  `json:"state"`
 	Country   string  `json:"country"`
 }

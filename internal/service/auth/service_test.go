@@ -20,7 +20,6 @@ func newTestLogger() *zap.Logger {
 }
 
 func TestLogin_Success(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 	password := "password123"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -28,14 +27,15 @@ func TestLogin_Success(t *testing.T) {
 	mockUser := &domain.User{
 		ID:       "user-123",
 		Email:    "test@example.com",
+		Document: "12345678901",
 		Password: string(hashedPassword),
 		Role:     domain.UserRoleUser,
 		Status:   "Active",
 	}
 
 	mockRepo := &mocks.MockUserRepository{
-		FindByEmailFunc: func(ctx context.Context, email string) (*domain.User, error) {
-			if email == "test@example.com" {
+		FindByDocumentFunc: func(ctx context.Context, document string) (*domain.User, error) {
+			if document == "12345678901" {
 				return mockUser, nil
 			}
 			return nil, nil
@@ -45,10 +45,8 @@ func TestLogin_Success(t *testing.T) {
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, "test-secret-key", newTestLogger())
 
-	// Act
-	accessToken, refreshToken, err := service.Login(ctx, "test@example.com", password)
+	accessToken, refreshToken, err := service.Login(ctx, "12345678901", password)
 
-	// Assert
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -60,23 +58,20 @@ func TestLogin_Success(t *testing.T) {
 	}
 }
 
-func TestLogin_InvalidEmail(t *testing.T) {
-	// Arrange
+func TestLogin_InvalidCPF(t *testing.T) {
 	ctx := context.Background()
 
 	mockRepo := &mocks.MockUserRepository{
-		FindByEmailFunc: func(ctx context.Context, email string) (*domain.User, error) {
-			return nil, nil // User not found
+		FindByDocumentFunc: func(ctx context.Context, document string) (*domain.User, error) {
+			return nil, nil
 		},
 	}
 
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, "test-secret-key", newTestLogger())
 
-	// Act
-	_, _, err := service.Login(ctx, "notfound@example.com", "password")
+	_, _, err := service.Login(ctx, "00000000000", "password")
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -86,18 +81,17 @@ func TestLogin_InvalidEmail(t *testing.T) {
 }
 
 func TestLogin_InvalidPassword(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
 
 	mockUser := &domain.User{
 		ID:       "user-123",
-		Email:    "test@example.com",
+		Document: "12345678901",
 		Password: string(hashedPassword),
 	}
 
 	mockRepo := &mocks.MockUserRepository{
-		FindByEmailFunc: func(ctx context.Context, email string) (*domain.User, error) {
+		FindByDocumentFunc: func(ctx context.Context, document string) (*domain.User, error) {
 			return mockUser, nil
 		},
 	}
@@ -105,10 +99,8 @@ func TestLogin_InvalidPassword(t *testing.T) {
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, "test-secret-key", newTestLogger())
 
-	// Act
-	_, _, err := service.Login(ctx, "test@example.com", "wrongpassword")
+	_, _, err := service.Login(ctx, "12345678901", "wrongpassword")
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -118,11 +110,10 @@ func TestLogin_InvalidPassword(t *testing.T) {
 }
 
 func TestLogin_RepositoryError(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 
 	mockRepo := &mocks.MockUserRepository{
-		FindByEmailFunc: func(ctx context.Context, email string) (*domain.User, error) {
+		FindByDocumentFunc: func(ctx context.Context, document string) (*domain.User, error) {
 			return nil, errors.New("database error")
 		},
 	}
@@ -130,17 +121,14 @@ func TestLogin_RepositoryError(t *testing.T) {
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, "test-secret-key", newTestLogger())
 
-	// Act
-	_, _, err := service.Login(ctx, "test@example.com", "password")
+	_, _, err := service.Login(ctx, "12345678901", "password")
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestRegister_Success(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 	var savedUser *domain.User
 
@@ -158,13 +146,12 @@ func TestRegister_Success(t *testing.T) {
 		ID:       "new-user-123",
 		Name:     "Test User",
 		Email:    "new@example.com",
+		Document: "12345678901",
 		Password: "password123",
 	}
 
-	// Act
 	err := service.Register(ctx, newUser)
 
-	// Assert
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -183,7 +170,6 @@ func TestRegister_Success(t *testing.T) {
 }
 
 func TestRegister_RepositoryError(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 
 	mockRepo := &mocks.MockUserRepository{
@@ -201,17 +187,14 @@ func TestRegister_RepositoryError(t *testing.T) {
 		Password: "password123",
 	}
 
-	// Act
 	err := service.Register(ctx, newUser)
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestValidateToken_Success(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 	jwtSecret := "test-secret-key"
 
@@ -233,7 +216,6 @@ func TestValidateToken_Success(t *testing.T) {
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, jwtSecret, newTestLogger())
 
-	// Create a valid token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":  "user-123",
 		"role": "user",
@@ -242,10 +224,8 @@ func TestValidateToken_Success(t *testing.T) {
 	})
 	tokenStr, _ := token.SignedString([]byte(jwtSecret))
 
-	// Act
 	user, err := service.ValidateToken(ctx, tokenStr)
 
-	// Assert
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -258,24 +238,20 @@ func TestValidateToken_Success(t *testing.T) {
 }
 
 func TestValidateToken_InvalidToken(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 
 	mockRepo := &mocks.MockUserRepository{}
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, "test-secret-key", newTestLogger())
 
-	// Act
 	_, err := service.ValidateToken(ctx, "invalid-token")
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestValidateToken_ExpiredToken(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 	jwtSecret := "test-secret-key"
 
@@ -283,26 +259,22 @@ func TestValidateToken_ExpiredToken(t *testing.T) {
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, jwtSecret, newTestLogger())
 
-	// Create an expired token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":  "user-123",
 		"role": "user",
-		"exp":  time.Now().Add(-1 * time.Hour).Unix(), // Expired
+		"exp":  time.Now().Add(-1 * time.Hour).Unix(),
 		"type": "access",
 	})
 	tokenStr, _ := token.SignedString([]byte(jwtSecret))
 
-	// Act
 	_, err := service.ValidateToken(ctx, tokenStr)
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error for expired token, got nil")
 	}
 }
 
 func TestRefreshToken_Success(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 	jwtSecret := "test-secret-key"
 
@@ -324,7 +296,6 @@ func TestRefreshToken_Success(t *testing.T) {
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, jwtSecret, newTestLogger())
 
-	// Create a valid refresh token
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":  "user-123",
 		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
@@ -332,10 +303,8 @@ func TestRefreshToken_Success(t *testing.T) {
 	})
 	refreshTokenStr, _ := refreshToken.SignedString([]byte(jwtSecret))
 
-	// Act
 	newAccessToken, err := service.RefreshToken(ctx, refreshTokenStr)
 
-	// Assert
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -345,37 +314,32 @@ func TestRefreshToken_Success(t *testing.T) {
 }
 
 func TestRefreshToken_InvalidToken(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 
 	mockRepo := &mocks.MockUserRepository{}
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, "test-secret-key", newTestLogger())
 
-	// Act
 	_, err := service.RefreshToken(ctx, "invalid-refresh-token")
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestRefreshToken_UserNotFound(t *testing.T) {
-	// Arrange
 	ctx := context.Background()
 	jwtSecret := "test-secret-key"
 
 	mockRepo := &mocks.MockUserRepository{
 		FindByIDFunc: func(ctx context.Context, id string) (*domain.User, error) {
-			return nil, nil // User not found
+			return nil, nil
 		},
 	}
 
 	mockCache := mocks.NewMockCache()
 	service := NewService(mockRepo, mockCache, jwtSecret, newTestLogger())
 
-	// Create a valid refresh token for non-existent user
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":  "nonexistent-user",
 		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
@@ -383,10 +347,8 @@ func TestRefreshToken_UserNotFound(t *testing.T) {
 	})
 	refreshTokenStr, _ := refreshToken.SignedString([]byte(jwtSecret))
 
-	// Act
 	_, err := service.RefreshToken(ctx, refreshTokenStr)
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

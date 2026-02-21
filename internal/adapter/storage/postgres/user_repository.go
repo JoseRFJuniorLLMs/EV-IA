@@ -50,3 +50,15 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) FindByDocument(ctx context.Context, document string) (*domain.User, error) {
+	var user domain.User
+	err := r.db.WithContext(ctx).First(&user, "document = ?", document).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}

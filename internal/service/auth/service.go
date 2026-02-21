@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
@@ -29,16 +30,19 @@ func NewService(userRepo ports.UserRepository, cache ports.Cache, jwtSecret stri
 	}
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (string, string, error) {
-	user, err := s.userRepo.FindByEmail(ctx, email)
+func (s *Service) Login(ctx context.Context, cpf, password string) (string, string, error) {
+	user, err := s.userRepo.FindByDocument(ctx, cpf)
 	if err != nil {
+		s.log.Error("Login: error finding user by CPF", zap.String("cpf", cpf), zap.Error(err))
 		return "", "", errors.New("invalid credentials")
 	}
 	if user == nil {
+		s.log.Warn("Login: user not found by CPF", zap.String("cpf", cpf))
 		return "", "", errors.New("invalid credentials")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		s.log.Warn("Login: password mismatch", zap.String("cpf", cpf))
 		return "", "", errors.New("invalid credentials")
 	}
 
@@ -46,9 +50,32 @@ func (s *Service) Login(ctx context.Context, email, password string) (string, st
 }
 
 func (s *Service) Register(ctx context.Context, user *domain.User) error {
+	// Check if email already exists
+	existing, err := s.userRepo.FindByEmail(ctx, user.Email)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return errors.New("email already registered")
+	}
+
+	// Check if CPF already exists
+	if user.Document != "" {
+		existingCPF, err := s.userRepo.FindByDocument(ctx, user.Document)
+		if err != nil {
+			return err
+		}
+		if existingCPF != nil {
+			return errors.New("cpf already registered")
+		}
+	}
+
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
+	}
+	if user.ID == "" {
+		user.ID = uuid.New().String()
 	}
 	user.Password = string(hashedPwd)
 	user.CreatedAt = time.Now()

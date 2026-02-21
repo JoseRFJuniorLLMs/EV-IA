@@ -9,9 +9,10 @@ import (
 
 // MockUserRepository is a mock implementation of UserRepository
 type MockUserRepository struct {
-	SaveFunc        func(ctx context.Context, user *domain.User) error
-	FindByIDFunc    func(ctx context.Context, id string) (*domain.User, error)
-	FindByEmailFunc func(ctx context.Context, email string) (*domain.User, error)
+	SaveFunc           func(ctx context.Context, user *domain.User) error
+	FindByIDFunc       func(ctx context.Context, id string) (*domain.User, error)
+	FindByEmailFunc    func(ctx context.Context, email string) (*domain.User, error)
+	FindByDocumentFunc func(ctx context.Context, document string) (*domain.User, error)
 }
 
 func (m *MockUserRepository) Save(ctx context.Context, user *domain.User) error {
@@ -31,6 +32,13 @@ func (m *MockUserRepository) FindByID(ctx context.Context, id string) (*domain.U
 func (m *MockUserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	if m.FindByEmailFunc != nil {
 		return m.FindByEmailFunc(ctx, email)
+	}
+	return nil, nil
+}
+
+func (m *MockUserRepository) FindByDocument(ctx context.Context, document string) (*domain.User, error) {
+	if m.FindByDocumentFunc != nil {
+		return m.FindByDocumentFunc(ctx, document)
 	}
 	return nil, nil
 }

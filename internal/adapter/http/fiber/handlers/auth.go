@@ -21,13 +21,15 @@ func NewAuthHandler(service ports.AuthService, log *zap.Logger) *AuthHandler {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
+	CPF      string `json:"cpf"`
 	Password string `json:"password"`
 }
 
-type LoginResponse struct {
-	Token        string `json:"token"`
-	RefreshToken string `json:"refresh_token"`
+type RegisterRequest struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	CPF      string `json:"cpf"`
 }
 
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
@@ -36,32 +38,71 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	token, refreshToken, err := h.service.Login(c.Context(), req.Email, req.Password)
+	if req.CPF == "" || req.Password == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "CPF and password are required"})
+	}
+
+	token, refreshToken, err := h.service.Login(c.Context(), req.CPF, req.Password)
 	if err != nil {
+		h.log.Warn("Login failed", zap.String("cpf", req.CPF), zap.Error(err))
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(LoginResponse{
-		Token:        token,
-		RefreshToken: refreshToken,
+	user, _ := h.service.ValidateToken(c.Context(), token)
+
+	return c.JSON(fiber.Map{
+		"tokens": fiber.Map{
+			"accessToken":  token,
+			"refreshToken": refreshToken,
+		},
+		"user": user,
 	})
 }
 
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
-	var user domain.User
-	if err := c.BodyParser(&user); err != nil {
+	var req RegisterRequest
+	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
+	if req.CPF == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "CPF is required"})
+	}
+
+	user := domain.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Document: req.CPF,
+	}
+	plainPassword := req.Password
+
 	if err := h.service.Register(c.Context(), &user); err != nil {
+		if err.Error() == "email already registered" || err.Error() == "cpf already registered" {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(user)
+	// Auto-login after registration using CPF
+	token, refreshToken, err := h.service.Login(c.Context(), req.CPF, plainPassword)
+	if err != nil {
+		user.Password = ""
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{"user": user})
+	}
+
+	user.Password = ""
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"user": user,
+		"tokens": fiber.Map{
+			"accessToken":  token,
+			"refreshToken": refreshToken,
+		},
+	})
 }
 
 type RefreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
@@ -75,5 +116,16 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"token": token})
+	return c.JSON(fiber.Map{
+		"accessToken":  token,
+		"refreshToken": req.RefreshToken,
+	})
+}
+
+func (h *AuthHandler) Me(c *fiber.Ctx) error {
+	user := c.Locals("user")
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Not authenticated"})
+	}
+	return c.JSON(user)
 }
