@@ -134,13 +134,41 @@ type ISO15118VehicleIdentity struct {
 
 // ChargingContract represents an ISO 15118 charging contract
 type ChargingContract struct {
-	ID              string    `json:"id"`
-	EMAID           string    `json:"emaid"`
-	ProviderID      string    `json:"provider_id"`
-	ContractType    string    `json:"contract_type"` // standard, v2g
-	V2GEnabled      bool      `json:"v2g_enabled"`
-	MaxChargePowerKW float64  `json:"max_charge_power_kw"`
-	MaxDischargePowerKW float64 `json:"max_discharge_power_kw,omitempty"`
-	ValidFrom       time.Time `json:"valid_from"`
-	ValidTo         time.Time `json:"valid_to"`
+	ID                  string    `json:"id"`
+	ContractID          string    `json:"contract_id"`
+	EMAID               string    `json:"emaid"`
+	ProviderID          string    `json:"provider_id"`
+	ContractType        string    `json:"contract_type"` // standard, v2g
+	V2GEnabled          bool      `json:"v2g_enabled"`
+	MaxChargePowerKW    float64   `json:"max_charge_power_kw"`
+	MaxDischargePowerKW float64   `json:"max_discharge_power_kw,omitempty"`
+	ValidFrom           time.Time `json:"valid_from"`
+	ValidTo             time.Time `json:"valid_to"`
+}
+
+// ISO15118Certificate represents a stored ISO 15118 certificate
+type ISO15118Certificate struct {
+	ID                  string     `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	EMAID               string     `json:"emaid" gorm:"type:varchar(100);uniqueIndex;not null"`
+	ContractID          string     `json:"contract_id" gorm:"type:varchar(100);uniqueIndex;not null"`
+	VehicleVIN          string     `json:"vehicle_vin,omitempty" gorm:"type:varchar(50);index"`
+	CertificatePEM      string     `json:"certificate_pem" gorm:"type:text;not null"`
+	CertificateChain    string     `json:"certificate_chain,omitempty" gorm:"type:text"`
+	PrivateKeyEncrypted string     `json:"private_key_encrypted,omitempty" gorm:"type:text"`
+	V2GCapable          bool       `json:"v2g_capable" gorm:"default:false"`
+	ValidFrom           time.Time  `json:"valid_from" gorm:"not null"`
+	ValidTo             time.Time  `json:"valid_to" gorm:"not null;index"`
+	Revoked             bool       `json:"revoked" gorm:"default:false"`
+	RevokedAt           *time.Time `json:"revoked_at,omitempty"`
+	RevocationReason    string     `json:"revocation_reason,omitempty" gorm:"type:varchar(200)"`
+	ProviderID          string     `json:"provider_id,omitempty" gorm:"type:varchar(50)"`
+	MaxChargePowerKW    float64    `json:"max_charge_power_kw,omitempty" gorm:"type:decimal(10,2)"`
+	MaxDischargePowerKW float64    `json:"max_discharge_power_kw,omitempty" gorm:"type:decimal(10,2)"`
+	CreatedAt           time.Time  `json:"created_at" gorm:"not null;default:now()"`
+	UpdatedAt           time.Time  `json:"updated_at" gorm:"not null;default:now()"`
+}
+
+// TableName returns the table name for GORM
+func (ISO15118Certificate) TableName() string {
+	return "iso15118_certificates"
 }

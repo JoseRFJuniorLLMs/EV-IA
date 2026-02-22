@@ -16,24 +16,24 @@ import (
 
 // ISO15118Service handles ISO 15118 Plug & Charge operations
 type ISO15118Service struct {
-	repo           ports.ISO15118Repository
-	log            *zap.Logger
-	config         *ISO15118Config
-	certCache      *certCache
-	ocspClient     *OCSPClient
+	repo       ports.ISO15118Repository
+	log        *zap.Logger
+	config     *ISO15118Config
+	certCache  *certCache
+	ocspClient *OCSPClient
 }
 
 // ISO15118Config holds ISO 15118 configuration
 type ISO15118Config struct {
-	RootCACertPath      string        // Path to V2G Root CA certificate
-	SubCACertPath       string        // Path to Sub CA certificate
-	CPOCertPath         string        // Path to CPO (Charge Point Operator) certificate
-	CPOKeyPath          string        // Path to CPO private key
-	OCSPResponderURL    string        // OCSP responder URL for certificate status
-	CertCacheDuration   time.Duration // How long to cache certificate validation
-	EnableOCSP          bool          // Enable OCSP checking
-	EnableCRL           bool          // Enable CRL checking
-	AllowExpiredCerts   bool          // Allow expired certs (for testing)
+	RootCACertPath    string        // Path to V2G Root CA certificate
+	SubCACertPath     string        // Path to Sub CA certificate
+	CPOCertPath       string        // Path to CPO (Charge Point Operator) certificate
+	CPOKeyPath        string        // Path to CPO private key
+	OCSPResponderURL  string        // OCSP responder URL for certificate status
+	CertCacheDuration time.Duration // How long to cache certificate validation
+	EnableOCSP        bool          // Enable OCSP checking
+	EnableCRL         bool          // Enable CRL checking
+	AllowExpiredCerts bool          // Allow expired certs (for testing)
 }
 
 // DefaultISO15118Config returns default ISO 15118 configuration
@@ -89,28 +89,6 @@ func NewISO15118Service(
 	}
 }
 
-// ISO15118Certificate represents a stored ISO 15118 certificate
-type ISO15118Certificate struct {
-	ID                   string    `json:"id"`
-	EMAID                string    `json:"emaid"` // E-Mobility Account Identifier
-	ContractID           string    `json:"contract_id"`
-	VehicleVIN           string    `json:"vehicle_vin,omitempty"`
-	CertificatePEM       string    `json:"certificate_pem"`
-	CertificateChain     string    `json:"certificate_chain,omitempty"`
-	PrivateKeyEncrypted  string    `json:"private_key_encrypted,omitempty"`
-	V2GCapable           bool      `json:"v2g_capable"`
-	ValidFrom            time.Time `json:"valid_from"`
-	ValidTo              time.Time `json:"valid_to"`
-	Revoked              bool      `json:"revoked"`
-	RevokedAt            *time.Time `json:"revoked_at,omitempty"`
-	RevocationReason     string    `json:"revocation_reason,omitempty"`
-	ProviderID           string    `json:"provider_id,omitempty"`
-	MaxChargePowerKW     float64   `json:"max_charge_power_kw,omitempty"`
-	MaxDischargePowerKW  float64   `json:"max_discharge_power_kw,omitempty"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
-}
-
 // AuthenticateVehicle authenticates a vehicle using its ISO 15118 certificate
 func (s *ISO15118Service) AuthenticateVehicle(ctx context.Context, certChain []byte) (*domain.ISO15118VehicleIdentity, error) {
 	// Parse the certificate chain
@@ -139,23 +117,23 @@ func (s *ISO15118Service) AuthenticateVehicle(ctx context.Context, certChain []b
 
 	// Check if certificate exists in database
 	storedCert, err := s.repo.GetCertificateByEMAID(ctx, identity.EMAID)
-	if err != nil {
+	if err != nil || storedCert == nil {
 		s.log.Warn("Certificate not found in database, creating new entry",
 			zap.String("emaid", identity.EMAID),
 		)
 
 		// Store new certificate
-		newCert := &ISO15118Certificate{
-			EMAID:            identity.EMAID,
-			ContractID:       identity.ContractID,
-			VehicleVIN:       identity.VehicleVIN,
-			CertificatePEM:   string(certChain),
-			V2GCapable:       identity.V2GCapable,
-			ValidFrom:        leafCert.NotBefore,
-			ValidTo:          leafCert.NotAfter,
-			Revoked:          false,
-			CreatedAt:        time.Now(),
-			UpdatedAt:        time.Now(),
+		newCert := &domain.ISO15118Certificate{
+			EMAID:          identity.EMAID,
+			ContractID:     identity.ContractID,
+			VehicleVIN:     identity.VehicleVIN,
+			CertificatePEM: string(certChain),
+			V2GCapable:     identity.V2GCapable,
+			ValidFrom:      leafCert.NotBefore,
+			ValidTo:        leafCert.NotAfter,
+			Revoked:        false,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
 		}
 
 		if err := s.repo.StoreCertificate(ctx, newCert); err != nil {
@@ -214,13 +192,13 @@ func (s *ISO15118Service) ValidateCertificate(ctx context.Context, certPEM []byt
 	if now.Before(leafCert.NotBefore) {
 		reason := "certificate not yet valid"
 		s.cacheValidation(cacheKey, false, reason)
-		return fmt.Errorf(reason)
+		return fmt.Errorf("%s", reason)
 	}
 
 	if now.After(leafCert.NotAfter) && !s.config.AllowExpiredCerts {
 		reason := "certificate has expired"
 		s.cacheValidation(cacheKey, false, reason)
-		return fmt.Errorf(reason)
+		return fmt.Errorf("%s", reason)
 	}
 
 	// Verify certificate chain
@@ -294,6 +272,18 @@ func (s *ISO15118Service) RevokeCertificate(ctx context.Context, emaid, reason s
 	return nil
 }
 
+// InstallCertificateRequest represents a certificate installation request
+type InstallCertificateRequest struct {
+	CertificatePEM      string  `json:"certificate_pem"`
+	CertificateChain    string  `json:"certificate_chain,omitempty"`
+	PrivateKeyEncrypted string  `json:"private_key_encrypted,omitempty"`
+	VehicleVIN          string  `json:"vehicle_vin,omitempty"`
+	ProviderID          string  `json:"provider_id,omitempty"`
+	V2GCapable          bool    `json:"v2g_capable"`
+	MaxChargePowerKW    float64 `json:"max_charge_power_kw,omitempty"`
+	MaxDischargePowerKW float64 `json:"max_discharge_power_kw,omitempty"`
+}
+
 // InstallCertificate installs a new contract certificate for a vehicle
 func (s *ISO15118Service) InstallCertificate(ctx context.Context, req *InstallCertificateRequest) error {
 	// Parse and validate the certificate
@@ -311,7 +301,7 @@ func (s *ISO15118Service) InstallCertificate(ctx context.Context, req *InstallCe
 	// Extract identity from certificate
 	identity := s.extractVehicleIdentity(leafCert)
 
-	cert := &ISO15118Certificate{
+	cert := &domain.ISO15118Certificate{
 		EMAID:               identity.EMAID,
 		ContractID:          identity.ContractID,
 		VehicleVIN:          req.VehicleVIN,
@@ -342,37 +332,25 @@ func (s *ISO15118Service) InstallCertificate(ctx context.Context, req *InstallCe
 	return nil
 }
 
-// InstallCertificateRequest represents a certificate installation request
-type InstallCertificateRequest struct {
-	CertificatePEM      string  `json:"certificate_pem"`
-	CertificateChain    string  `json:"certificate_chain,omitempty"`
-	PrivateKeyEncrypted string  `json:"private_key_encrypted,omitempty"`
-	VehicleVIN          string  `json:"vehicle_vin,omitempty"`
-	ProviderID          string  `json:"provider_id,omitempty"`
-	V2GCapable          bool    `json:"v2g_capable"`
-	MaxChargePowerKW    float64 `json:"max_charge_power_kw,omitempty"`
-	MaxDischargePowerKW float64 `json:"max_discharge_power_kw,omitempty"`
-}
-
 // GetCertificateStatus gets the status of a certificate
-func (s *ISO15118Service) GetCertificateStatus(ctx context.Context, emaid string) (*CertificateStatus, error) {
+func (s *ISO15118Service) GetCertificateStatus(ctx context.Context, emaid string) (*ports.ISO15118CertificateStatus, error) {
 	cert, err := s.repo.GetCertificateByEMAID(ctx, emaid)
 	if err != nil {
 		return nil, fmt.Errorf("certificate not found: %w", err)
 	}
 
 	now := time.Now()
-	status := &CertificateStatus{
-		EMAID:          cert.EMAID,
-		ContractID:     cert.ContractID,
-		Valid:          !cert.Revoked && now.After(cert.ValidFrom) && now.Before(cert.ValidTo),
-		Revoked:        cert.Revoked,
-		RevokedAt:      cert.RevokedAt,
+	status := &ports.ISO15118CertificateStatus{
+		EMAID:            cert.EMAID,
+		ContractID:       cert.ContractID,
+		Valid:            !cert.Revoked && now.After(cert.ValidFrom) && now.Before(cert.ValidTo),
+		Revoked:          cert.Revoked,
+		RevokedAt:        cert.RevokedAt,
 		RevocationReason: cert.RevocationReason,
-		ValidFrom:      cert.ValidFrom,
-		ValidTo:        cert.ValidTo,
-		DaysUntilExpiry: int(cert.ValidTo.Sub(now).Hours() / 24),
-		V2GCapable:     cert.V2GCapable,
+		ValidFrom:        cert.ValidFrom,
+		ValidTo:          cert.ValidTo,
+		DaysUntilExpiry:  int(cert.ValidTo.Sub(now).Hours() / 24),
+		V2GCapable:       cert.V2GCapable,
 	}
 
 	if status.DaysUntilExpiry < 0 {
@@ -381,21 +359,6 @@ func (s *ISO15118Service) GetCertificateStatus(ctx context.Context, emaid string
 	}
 
 	return status, nil
-}
-
-// CertificateStatus represents the status of an ISO 15118 certificate
-type CertificateStatus struct {
-	EMAID            string     `json:"emaid"`
-	ContractID       string     `json:"contract_id"`
-	Valid            bool       `json:"valid"`
-	Expired          bool       `json:"expired"`
-	Revoked          bool       `json:"revoked"`
-	RevokedAt        *time.Time `json:"revoked_at,omitempty"`
-	RevocationReason string     `json:"revocation_reason,omitempty"`
-	ValidFrom        time.Time  `json:"valid_from"`
-	ValidTo          time.Time  `json:"valid_to"`
-	DaysUntilExpiry  int        `json:"days_until_expiry"`
-	V2GCapable       bool       `json:"v2g_capable"`
 }
 
 // --- Helper methods ---
@@ -468,13 +431,7 @@ func (s *ISO15118Service) verifyCertificateChain(certs []*x509.Certificate) erro
 		return fmt.Errorf("empty certificate chain")
 	}
 
-	// For a proper implementation, you would:
-	// 1. Load the V2G Root CA
-	// 2. Build the intermediate chain
-	// 3. Verify each certificate is signed by its parent
-	// 4. Check that the chain ends at a trusted root
-
-	// Simplified verification: just check that each cert is signed by the next
+	// Simplified verification: check that each cert is signed by the next
 	for i := 0; i < len(certs)-1; i++ {
 		child := certs[i]
 		parent := certs[i+1]
@@ -489,13 +446,7 @@ func (s *ISO15118Service) verifyCertificateChain(certs []*x509.Certificate) erro
 
 // checkOCSPStatus checks the OCSP status of a certificate
 func (s *ISO15118Service) checkOCSPStatus(ctx context.Context, cert *x509.Certificate) error {
-	// OCSP checking would require:
-	// 1. Building an OCSP request
-	// 2. Sending it to the OCSP responder
-	// 3. Verifying the response signature
-	// 4. Checking the certificate status
-
-	// For now, this is a placeholder
+	// OCSP checking placeholder
 	s.log.Debug("OCSP check skipped - not fully implemented",
 		zap.String("subject", cert.Subject.String()),
 	)
@@ -536,8 +487,6 @@ func (s *ISO15118Service) cacheValidation(key string, valid bool, reason string)
 
 // invalidateCacheForEMAID invalidates all cached validations for an EMAID
 func (s *ISO15118Service) invalidateCacheForEMAID(emaid string) {
-	// In a real implementation, you would track which cache keys
-	// belong to which EMAID. For simplicity, we clear the whole cache.
 	s.certCache.mu.Lock()
 	defer s.certCache.mu.Unlock()
 

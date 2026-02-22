@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/seu-repo/sigec-ve/internal/domain"
+	"github.com/seu-repo/sigec-ve/internal/ports"
 )
 
 // MockV2GRepository is a mock implementation of V2GRepository
@@ -66,16 +67,6 @@ func (m *MockV2GRepository) GetSessionsByUser(ctx context.Context, userID string
 	return result, nil
 }
 
-func (m *MockV2GRepository) GetActiveSessions(ctx context.Context) ([]domain.V2GSession, error) {
-	var result []domain.V2GSession
-	for _, s := range m.sessions {
-		if s.Status == domain.V2GStatusActive {
-			result = append(result, *s)
-		}
-	}
-	return result, nil
-}
-
 func (m *MockV2GRepository) SavePreferences(ctx context.Context, prefs *domain.V2GPreferences) error {
 	m.preferences[prefs.UserID] = prefs
 	return nil
@@ -94,49 +85,24 @@ func (m *MockV2GRepository) GetPreferences(ctx context.Context, userID string) (
 	}, nil
 }
 
-func (m *MockV2GRepository) CreateEvent(ctx context.Context, event *domain.V2GEvent) error {
-	return nil
-}
-
-func (m *MockV2GRepository) GetEventsBySession(ctx context.Context, sessionID string) ([]domain.V2GEvent, error) {
-	return nil, nil
-}
-
 func (m *MockV2GRepository) GetUserStats(ctx context.Context, userID string, startDate, endDate time.Time) (*domain.V2GStats, error) {
 	return &domain.V2GStats{
-		EntityID:                userID,
-		EntityType:              "user",
-		TotalSessions:           10,
+		EntityID:                 userID,
+		EntityType:               "user",
+		TotalSessions:            10,
 		TotalEnergyDischargedKWh: 150.0,
-		TotalCompensation:       120.0,
+		TotalCompensation:        120.0,
 	}, nil
 }
 
 func (m *MockV2GRepository) GetChargePointStats(ctx context.Context, chargePointID string, startDate, endDate time.Time) (*domain.V2GStats, error) {
 	return &domain.V2GStats{
-		EntityID:                chargePointID,
-		EntityType:              "charge_point",
-		TotalSessions:           50,
+		EntityID:                 chargePointID,
+		EntityType:               "charge_point",
+		TotalSessions:            50,
 		TotalEnergyDischargedKWh: 500.0,
-		TotalCompensation:       400.0,
+		TotalCompensation:        400.0,
 	}, nil
-}
-
-func (m *MockV2GRepository) GetGlobalStats(ctx context.Context, startDate, endDate time.Time) (*domain.V2GStats, error) {
-	return &domain.V2GStats{
-		EntityType:              "global",
-		TotalSessions:           1000,
-		TotalEnergyDischargedKWh: 10000.0,
-		TotalCompensation:       8000.0,
-	}, nil
-}
-
-func (m *MockV2GRepository) GetPendingCompensations(ctx context.Context) ([]domain.V2GSession, error) {
-	return nil, nil
-}
-
-func (m *MockV2GRepository) MarkCompensationPaid(ctx context.Context, sessionID string, paymentID string) error {
-	return nil
 }
 
 // MockGridPriceService is a mock implementation of GridPriceService
@@ -191,10 +157,63 @@ func NewMockOCPPCommandService() *MockOCPPCommandService {
 	}
 }
 
+func (m *MockOCPPCommandService) RemoteStartTransaction(ctx context.Context, chargePointID, idToken string, evseID *int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) RemoteStopTransaction(ctx context.Context, chargePointID, transactionID string) error {
+	return nil
+}
+func (m *MockOCPPCommandService) Reset(ctx context.Context, chargePointID string, resetType string, evseID *int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) TriggerMessage(ctx context.Context, chargePointID, requestedMessage string, evseID *int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) SetChargingProfile(ctx context.Context, chargePointID string, evseID int, profile interface{}) error {
+	return nil
+}
+func (m *MockOCPPCommandService) ClearChargingProfile(ctx context.Context, chargePointID string, profileID *int, evseID *int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) UpdateFirmware(ctx context.Context, chargePointID, firmwareURL, retrieveDateTime string, installDateTime *time.Time, retries, retryInterval *int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) UpdateFirmwareSigned(ctx context.Context, chargePointID, firmwareURL, retrieveDateTime, signingCert, signature string, retries, retryInterval *int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) UnlockConnector(ctx context.Context, chargePointID string, evseID, connectorID int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) ChangeAvailability(ctx context.Context, chargePointID string, operationalStatus string, evseID *int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) GetVariables(ctx context.Context, chargePointID string, variables []ports.GetVariableRequest) ([]ports.GetVariableResponse, error) {
+	return nil, nil
+}
+func (m *MockOCPPCommandService) SetVariables(ctx context.Context, chargePointID string, variables []ports.SetVariableRequest) error {
+	return nil
+}
+func (m *MockOCPPCommandService) GetLog(ctx context.Context, chargePointID, logType, uploadURL string) error {
+	return nil
+}
+func (m *MockOCPPCommandService) SetV2GChargingProfile(ctx context.Context, chargePointID string, evseID int, dischargePowerKW float64, durationSeconds int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) ClearV2GChargingProfile(ctx context.Context, chargePointID string, evseID int) error {
+	return nil
+}
+func (m *MockOCPPCommandService) GetV2GCapability(ctx context.Context, chargePointID string) (*domain.V2GCapability, error) {
+	return &domain.V2GCapability{
+		Supported:             true,
+		MaxDischargePowerKW:   50.0,
+		MaxDischargeCurrent:   125.0,
+		BidirectionalCharging: true,
+		ISO15118Support:       true,
+	}, nil
+}
 func (m *MockOCPPCommandService) IsConnected(chargePointID string) bool {
 	return m.connected[chargePointID]
 }
-
 func (m *MockOCPPCommandService) GetConnectedClients() []string {
 	var clients []string
 	for id, connected := range m.connected {
@@ -205,32 +224,14 @@ func (m *MockOCPPCommandService) GetConnectedClients() []string {
 	return clients
 }
 
-func (m *MockOCPPCommandService) SetV2GChargingProfile(ctx context.Context, chargePointID string, evseID int, dischargePowerKW float64, durationSeconds int) error {
-	return nil
-}
-
-func (m *MockOCPPCommandService) ClearV2GChargingProfile(ctx context.Context, chargePointID string, evseID int) error {
-	return nil
-}
-
-func (m *MockOCPPCommandService) GetV2GCapability(ctx context.Context, chargePointID string) (*domain.V2GCapability, error) {
-	return &domain.V2GCapability{
-		Supported:             true,
-		MaxDischargePowerKW:   50.0,
-		MaxDischargeCurrentA:  125.0,
-		BidirectionalCharging: true,
-		ISO15118Support:       true,
-	}, nil
-}
-
 // Test helper to create V2G service with mocks
-func createTestV2GService() (*V2GService, *MockV2GRepository) {
+func createTestV2GService() (*Service, *MockV2GRepository) {
 	logger := zap.NewNop()
 	repo := NewMockV2GRepository()
 	gridPrice := NewMockGridPriceService()
 	ocpp := NewMockOCPPCommandService()
 
-	service := NewV2GService(repo, gridPrice, ocpp, nil, logger, nil)
+	service := NewService(repo, nil, nil, gridPrice, ocpp, nil, logger, nil)
 	return service, repo
 }
 
@@ -279,7 +280,6 @@ func TestV2GService_SetUserPreferences(t *testing.T) {
 		t.Fatalf("SetUserPreferences failed: %v", err)
 	}
 
-	// Verify preferences were saved
 	savedPrefs := repo.preferences["user123"]
 	if savedPrefs == nil {
 		t.Fatal("Preferences not saved")
@@ -298,14 +298,12 @@ func TestV2GService_GetUserPreferences(t *testing.T) {
 	service, _ := createTestV2GService()
 	ctx := context.Background()
 
-	// Get default preferences for user without saved preferences
 	prefs, err := service.GetUserPreferences(ctx, "newuser")
 	if err != nil {
 		t.Fatalf("GetUserPreferences failed: %v", err)
 	}
 
-	// Check defaults
-	if prefs.AutoDischarge != false {
+	if prefs.AutoDischarge {
 		t.Error("Expected AutoDischarge to be false by default")
 	}
 
@@ -348,15 +346,15 @@ func TestV2GService_CalculateCompensation(t *testing.T) {
 	ctx := context.Background()
 
 	session := &domain.V2GSession{
-		ID:               "session123",
-		ChargePointID:    "CP001",
-		UserID:           "user123",
-		Direction:        domain.V2GDirectionDischarging,
-		Status:           domain.V2GStatusCompleted,
+		ID:                "session123",
+		ChargePointID:     "CP001",
+		UserID:            "user123",
+		Direction:         domain.V2GDirectionDischarging,
+		Status:            domain.V2GStatusCompleted,
 		EnergyTransferred: -20.0, // 20 kWh discharged (negative)
-		GridPriceAtStart: 0.80,
-		CurrentGridPrice: 0.90,
-		StartTime:        time.Now().Add(-2 * time.Hour),
+		GridPriceAtStart:  0.80,
+		CurrentGridPrice:  0.90,
+		StartTime:         time.Now().Add(-2 * time.Hour),
 	}
 
 	compensation, err := service.CalculateCompensation(ctx, session)
@@ -364,12 +362,11 @@ func TestV2GService_CalculateCompensation(t *testing.T) {
 		t.Fatalf("CalculateCompensation failed: %v", err)
 	}
 
-	// Verify compensation was calculated
-	if compensation.EnergyKWh <= 0 {
+	if compensation.EnergyDischargedKWh <= 0 {
 		t.Error("Expected positive energy value")
 	}
 
-	if compensation.Amount <= 0 {
+	if compensation.NetAmount <= 0 {
 		t.Error("Expected positive compensation amount")
 	}
 

@@ -619,23 +619,23 @@ type ISO15118CertificateStatus struct {
 // ISO15118Repository handles ISO 15118 certificate persistence
 type ISO15118Repository interface {
 	// StoreCertificate stores a new certificate
-	StoreCertificate(ctx context.Context, cert interface{}) error
+	StoreCertificate(ctx context.Context, cert *domain.ISO15118Certificate) error
 
 	// GetCertificateByEMAID retrieves a certificate by EMAID
-	GetCertificateByEMAID(ctx context.Context, emaid string) (interface{}, error)
+	GetCertificateByEMAID(ctx context.Context, emaid string) (*domain.ISO15118Certificate, error)
 
 	// GetCertificateByContractID retrieves a certificate by contract ID
-	GetCertificateByContractID(ctx context.Context, contractID string) (interface{}, error)
+	GetCertificateByContractID(ctx context.Context, contractID string) (*domain.ISO15118Certificate, error)
 
 	// GetCertificateByVIN retrieves certificates by vehicle VIN
-	GetCertificateByVIN(ctx context.Context, vin string) ([]interface{}, error)
+	GetCertificateByVIN(ctx context.Context, vin string) ([]*domain.ISO15118Certificate, error)
 
 	// UpdateCertificate updates an existing certificate
-	UpdateCertificate(ctx context.Context, cert interface{}) error
+	UpdateCertificate(ctx context.Context, cert *domain.ISO15118Certificate) error
 
 	// GetExpiringCertificates retrieves certificates expiring within N days
-	GetExpiringCertificates(ctx context.Context, daysUntilExpiry int) ([]interface{}, error)
+	GetExpiringCertificates(ctx context.Context, daysUntilExpiry int) ([]*domain.ISO15118Certificate, error)
 
 	// GetV2GCapableCertificates retrieves all V2G-capable certificates
-	GetV2GCapableCertificates(ctx context.Context) ([]interface{}, error)
+	GetV2GCapableCertificates(ctx context.Context) ([]*domain.ISO15118Certificate, error)
 }
