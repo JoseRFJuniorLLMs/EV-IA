@@ -212,13 +212,13 @@ func main() {
 	protected.Get("/devices/:id", deviceHandler.Get)
 	protected.Patch("/devices/:id/status", deviceHandler.UpdateStatus)
 
-	// Transaction routes
+	// Transaction routes (specific paths MUST come before :id to avoid matching as param)
 	txHandler := handlers.NewTransactionHandler(transactionService, logger)
 	protected.Post("/transactions/start", txHandler.Start)
-	protected.Post("/transactions/:id/stop", txHandler.Stop)
-	protected.Get("/transactions/:id", txHandler.Get)
 	protected.Get("/transactions/history", txHandler.GetHistory)
 	protected.Get("/transactions/active", txHandler.GetActive)
+	protected.Post("/transactions/:id/stop", txHandler.Stop)
+	protected.Get("/transactions/:id", txHandler.Get)
 
 	// Voice routes
 	voiceHandler := handlers.NewVoiceHandler(voiceAssistant, logger)

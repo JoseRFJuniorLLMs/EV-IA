@@ -48,15 +48,17 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	user, _ := h.service.ValidateToken(c.Context(), token)
-
-	return c.JSON(fiber.Map{
+	user, err2 := h.service.ValidateToken(c.Context(), token)
+	resp := fiber.Map{
 		"tokens": fiber.Map{
 			"accessToken":  token,
 			"refreshToken": refreshToken,
 		},
-		"user": user,
-	})
+	}
+	if err2 == nil && user != nil {
+		resp["user"] = user
+	}
+	return c.JSON(resp)
 }
 
 func (h *AuthHandler) Register(c *fiber.Ctx) error {

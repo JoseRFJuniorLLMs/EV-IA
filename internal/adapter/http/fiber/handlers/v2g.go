@@ -45,7 +45,7 @@ type StartDischargeRequest struct {
 // StartDischarge handles POST /api/v1/v2g/discharge/start
 func (h *V2GHandler) StartDischarge(c *fiber.Ctx) error {
 	// Get user ID from context (set by auth middleware)
-	userID := c.Locals("userID").(string)
+	userID := c.Locals("user_id").(string)
 
 	var req StartDischargeRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -232,7 +232,7 @@ type SetPreferencesRequest struct {
 
 // GetPreferences handles GET /api/v1/v2g/preferences
 func (h *V2GHandler) GetPreferences(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID := c.Locals("user_id").(string)
 
 	prefs, err := h.v2gService.GetUserPreferences(c.Context(), userID)
 	if err != nil {
@@ -246,7 +246,7 @@ func (h *V2GHandler) GetPreferences(c *fiber.Ctx) error {
 
 // SetPreferences handles POST /api/v1/v2g/preferences
 func (h *V2GHandler) SetPreferences(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID := c.Locals("user_id").(string)
 
 	var req SetPreferencesRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -282,7 +282,7 @@ func (h *V2GHandler) SetPreferences(c *fiber.Ctx) error {
 
 // GetUserStats handles GET /api/v1/v2g/stats
 func (h *V2GHandler) GetUserStats(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID := c.Locals("user_id").(string)
 
 	// Default to last 30 days
 	endDate := time.Now()
@@ -352,7 +352,7 @@ type OptimizeV2GRequest struct {
 
 // OptimizeV2G handles POST /api/v1/v2g/optimize
 func (h *V2GHandler) OptimizeV2G(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID := c.Locals("user_id").(string)
 
 	var req OptimizeV2GRequest
 	if err := c.BodyParser(&req); err != nil {

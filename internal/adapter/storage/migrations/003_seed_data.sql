@@ -18,17 +18,17 @@ DELETE FROM users WHERE email != 'admin@sigec-ve.com';
 
 -- =============================================
 -- USERS (Clients) - password: 123456 for all
--- bcrypt hash of '123456': $2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6
+-- bcrypt hash of '123456' (generated with bcrypt.DefaultCost=10)
 -- =============================================
 INSERT INTO users (id, name, email, password, phone, document, role, status, email_verified) VALUES
-('a0000001-0000-0000-0000-000000000001', 'Carlos Silva', 'carlos@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999001001', '12345678901', 'user', 'active', true),
-('a0000001-0000-0000-0000-000000000002', 'Ana Oliveira', 'ana@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999002002', '23456789012', 'user', 'active', true),
-('a0000001-0000-0000-0000-000000000003', 'Roberto Santos', 'roberto@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999003003', '34567890123', 'user', 'active', true),
-('a0000001-0000-0000-0000-000000000004', 'Maria Souza', 'maria@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999004004', '45678901234', 'user', 'active', true),
-('a0000001-0000-0000-0000-000000000005', 'Fernando Lima', 'fernando@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999005005', '56789012345', 'user', 'active', true),
-('a0000001-0000-0000-0000-000000000006', 'Juliana Costa', 'juliana@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999006006', '67890123456', 'operator', 'active', true),
-('a0000001-0000-0000-0000-000000000007', 'Pedro Mendes', 'pedro@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999007007', '78901234567', 'user', 'active', true),
-('a0000001-0000-0000-0000-000000000008', 'Lucia Ferreira', 'lucia@ev.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqMXlDqK5EgZR1lSPgPNf7UQ.m1.6', '11999008008', '89012345678', 'user', 'active', true);
+('a0000001-0000-0000-0000-000000000001', 'Carlos Silva', 'carlos@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999001001', '12345678901', 'user', 'active', true),
+('a0000001-0000-0000-0000-000000000002', 'Ana Oliveira', 'ana@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999002002', '23456789012', 'user', 'active', true),
+('a0000001-0000-0000-0000-000000000003', 'Roberto Santos', 'roberto@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999003003', '34567890123', 'user', 'active', true),
+('a0000001-0000-0000-0000-000000000004', 'Maria Souza', 'maria@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999004004', '45678901234', 'user', 'active', true),
+('a0000001-0000-0000-0000-000000000005', 'Fernando Lima', 'fernando@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999005005', '56789012345', 'user', 'active', true),
+('a0000001-0000-0000-0000-000000000006', 'Juliana Costa', 'juliana@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999006006', '67890123456', 'operator', 'active', true),
+('a0000001-0000-0000-0000-000000000007', 'Pedro Mendes', 'pedro@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999007007', '78901234567', 'user', 'active', true),
+('a0000001-0000-0000-0000-000000000008', 'Lucia Ferreira', 'lucia@ev.com', '$2a$10$t5Ixd/WKmT3/LC9Na6TXK.5m68G87GEfhNiBaAQQmzka3n/cudmba', '11999008008', '89012345678', 'user', 'active', true);
 
 -- =============================================
 -- LOCATIONS (Sao Paulo region)
