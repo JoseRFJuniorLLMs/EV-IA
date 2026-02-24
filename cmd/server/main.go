@@ -31,7 +31,7 @@ import (
 	"github.com/seu-repo/sigec-ve/internal/adapter/http/fiber/middleware"
 	v201 "github.com/seu-repo/sigec-ve/internal/adapter/ocpp/v201"
 	"github.com/seu-repo/sigec-ve/internal/adapter/queue"
-	"github.com/seu-repo/sigec-ve/internal/adapter/storage/postgres"
+	nzdb "github.com/seu-repo/sigec-ve/internal/adapter/storage/nietzsche"
 	wsAdapter "github.com/seu-repo/sigec-ve/internal/adapter/websocket"
 	"github.com/seu-repo/sigec-ve/internal/observability/telemetry"
 	"github.com/seu-repo/sigec-ve/internal/service/auth"
@@ -79,28 +79,26 @@ func main() {
 		}
 	}()
 
-	// 4. Initialize PostgreSQL Connection Pool
-	db, err := postgres.NewConnection(cfg.Database.URL, logger)
+	// 4. Initialize NietzscheDB Connection
+	nietzscheAddr := os.Getenv("NIETZSCHE_ADDR")
+	if nietzscheAddr == "" {
+		nietzscheAddr = "34.123.223.50:50051"
+	}
+	db, err := nzdb.NewConnection(nietzscheAddr, logger)
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		logger.Fatal("Failed to connect to NietzscheDB", zap.Error(err))
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		logger.Fatal("Failed to get underlying SQL DB", zap.Error(err))
-	}
-	defer sqlDB.Close()
-
-	// Run migrations
-	if err := postgres.RunMigrations(db); err != nil {
-		logger.Fatal("Failed to run migrations", zap.Error(err))
-	}
+	defer db.Close()
 
 	// 5. Initialize Redis Cache
 	redisCache, err := cache.NewRedisCache(cfg.Redis.URL, logger)
 	if err != nil {
-		logger.Fatal("Failed to connect to Redis", zap.Error(err))
+		logger.Warn("Redis not available, running without cache", zap.Error(err))
+		redisCache = nil
 	}
-	defer redisCache.Close()
+	if redisCache != nil {
+		defer redisCache.Close()
+	}
 
 	// 6. Initialize Message Queue (NATS) - Optional
 	messageQueue, err := queue.NewNATSQueue(cfg.NATS.URL, logger)
@@ -111,10 +109,10 @@ func main() {
 		defer messageQueue.Close()
 	}
 
-	// 7. Initialize Repositories
-	chargePointRepo := postgres.NewChargePointRepository(db, logger)
-	transactionRepo := postgres.NewTransactionRepository(db, logger)
-	userRepo := postgres.NewUserRepository(db, logger)
+	// 7. Initialize Repositories (NietzscheDB-backed)
+	chargePointRepo := nzdb.NewChargePointRepository(db, logger)
+	transactionRepo := nzdb.NewTransactionRepository(db, logger)
+	userRepo := nzdb.NewUserRepository(db, logger)
 
 	// 8. Initialize Payment Gateway (Stripe)
 	stripeGateway := payment.NewStripeService(cfg.Payment.Stripe.SecretKey, logger)
@@ -172,12 +170,14 @@ func main() {
 		return c.SendString("OK")
 	})
 	app.Get("/health/ready", func(c *fiber.Ctx) error {
-		// Check all dependencies
-		if err := sqlDB.Ping(); err != nil {
+		// Check NietzscheDB
+		if err := db.Client.HealthCheck(context.Background()); err != nil {
 			return c.Status(503).SendString("Database not ready")
 		}
-		if err := redisCache.Ping(); err != nil {
-			return c.Status(503).SendString("Cache not ready")
+		if redisCache != nil {
+			if err := redisCache.Ping(); err != nil {
+				return c.Status(503).SendString("Cache not ready")
+			}
 		}
 		return c.SendString("Ready")
 	})

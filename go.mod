@@ -2,7 +2,10 @@ module github.com/seu-repo/sigec-ve
 
 go 1.24.0
 
+replace nietzsche-sdk => ../NietzscheDB/sdks/go
+
 require (
+	nietzsche-sdk v0.0.0
 	github.com/gofiber/fiber/v2 v2.52.0
 	github.com/gofiber/websocket/v2 v2.2.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
