@@ -8,7 +8,6 @@ type Config struct {
 	GRPC           GRPCConfig           `mapstructure:"grpc"`
 	OCPP           OCPPConfig           `mapstructure:"ocpp"`
 	Database       DatabaseConfig       `mapstructure:"database"`
-	Redis          RedisConfig          `mapstructure:"redis"`
 	NATS           NATSConfig           `mapstructure:"nats"`
 	JWT            JWTConfig            `mapstructure:"jwt"`
 	Gemini         GeminiConfig         `mapstructure:"gemini"`
@@ -65,24 +64,9 @@ type OCPPSecurity struct {
 }
 
 type DatabaseConfig struct {
-	URL             string        `mapstructure:"url"`
-	MaxOpenConns    int           `mapstructure:"max_open_conns"`
-	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
-	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
-	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
-	AutoMigrate     bool          `mapstructure:"auto_migrate"`
-	LogQueries      bool          `mapstructure:"log_queries"`
-}
-
-type RedisConfig struct {
-	URL          string        `mapstructure:"url"`
-	MaxRetries   int           `mapstructure:"max_retries"`
-	PoolSize     int           `mapstructure:"pool_size"`
-	MinIdleConns int           `mapstructure:"min_idle_conns"`
-	DialTimeout  time.Duration `mapstructure:"dial_timeout"`
-	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout time.Duration `mapstructure:"write_timeout"`
-	PoolTimeout  time.Duration `mapstructure:"pool_timeout"`
+	GRPCAddress string `mapstructure:"grpc_address"` // NietzscheDB gRPC endpoint (default: "136.111.0.47:50051")
+	Collection  string `mapstructure:"collection"`   // NietzscheDB collection name (default: "ev-ia")
+	LogQueries  bool   `mapstructure:"log_queries"`
 }
 
 type NATSConfig struct {

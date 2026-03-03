@@ -82,7 +82,7 @@ func main() {
 	// 4. Initialize NietzscheDB Connection
 	nietzscheAddr := os.Getenv("NIETZSCHE_ADDR")
 	if nietzscheAddr == "" {
-		nietzscheAddr = "34.123.223.50:50051"
+		nietzscheAddr = "136.111.0.47:50051"
 	}
 	db, err := nzdb.NewConnection(nietzscheAddr, logger)
 	if err != nil {
@@ -90,15 +90,9 @@ func main() {
 	}
 	defer db.Close()
 
-	// 5. Initialize Redis Cache
-	redisCache, err := cache.NewRedisCache(cfg.Redis.URL, logger)
-	if err != nil {
-		logger.Warn("Redis not available, running without cache", zap.Error(err))
-		redisCache = nil
-	}
-	if redisCache != nil {
-		defer redisCache.Close()
-	}
+	// 5. Initialize Local Cache
+	localCache := cache.NewLocalCache(time.Minute, logger)
+	defer localCache.Close()
 
 	// 6. Initialize Message Queue (NATS) - Optional
 	messageQueue, err := queue.NewNATSQueue(cfg.NATS.URL, logger)
@@ -118,8 +112,8 @@ func main() {
 	stripeGateway := payment.NewStripeService(cfg.Payment.Stripe.SecretKey, logger)
 
 	// 9. Initialize Services (Business Logic Layer)
-	authService := auth.NewService(userRepo, redisCache, cfg.JWT.Secret, logger)
-	deviceService := device.NewService(chargePointRepo, redisCache, messageQueue, logger)
+	authService := auth.NewService(userRepo, localCache, cfg.JWT.Secret, logger)
+	deviceService := device.NewService(chargePointRepo, localCache, messageQueue, logger)
 	transactionService := transaction.NewService(transactionRepo, deviceService, messageQueue, logger)
 	billingService := transaction.NewBillingService(transactionRepo, messageQueue, transaction.DefaultPricingConfig(), logger)
 
@@ -174,10 +168,8 @@ func main() {
 		if err := db.Client.HealthCheck(context.Background()); err != nil {
 			return c.Status(503).SendString("Database not ready")
 		}
-		if redisCache != nil {
-			if err := redisCache.Ping(); err != nil {
-				return c.Status(503).SendString("Cache not ready")
-			}
+		if err := localCache.Ping(); err != nil {
+			return c.Status(503).SendString("Cache not ready")
 		}
 		return c.SendString("Ready")
 	})
