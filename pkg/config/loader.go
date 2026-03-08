@@ -21,7 +21,6 @@ func Load() (*Config, error) {
 	// Allow common env vars without APP_ prefix for Docker/VM deploys
 	viper.BindEnv("http.port", "HTTP_PORT", "APP_HTTP_PORT")
 	viper.BindEnv("database.url", "DATABASE_URL", "APP_DATABASE_URL")
-	viper.BindEnv("redis.url", "REDIS_URL", "APP_REDIS_URL")
 	viper.BindEnv("nats.url", "NATS_URL", "APP_NATS_URL")
 	viper.BindEnv("jwt.secret", "JWT_SECRET", "APP_JWT_SECRET")
 	viper.BindEnv("gemini.api_key", "GEMINI_API_KEY", "APP_GEMINI_API_KEY")

@@ -9,7 +9,7 @@ Este documento resume o estado atual do desenvolvimento do sistema SIGEC-VE Ente
 ### 1. Infraestrutura e Configuração
 - **Estrutura do Projeto:** Layout padrão Go (`cmd`, `internal`, `pkg`, `configs`, `deployments`).
 - **Configuração:** Gerenciamento centralizado via `configs/config.yaml` e carregamento com Viper.
-- **Containerização:** `Dockerfile` multi-stage (build + distroless) e `docker-compose.yaml` completo (Postgres, Redis, NATS, Jaeger, Prometheus).
+- **Containerização:** `Dockerfile` multi-stage (build + distroless) e `docker-compose.yaml` completo (Postgres, NietzscheDB, NATS, Jaeger, Prometheus).
 - **CI/CD:** Pipeline GitHub Actions configurado para testes, linting e build.
 - **Kubernetes:** Manifestos de deployment base (`deployments/kubernetes`).
 - **Automação:** `Makefile` com comandos para build, run, test, migrate, proto-gen.
@@ -19,8 +19,8 @@ Este documento resume o estado atual do desenvolvimento do sistema SIGEC-VE Ente
 - **Interfaces (Ports):** Interfaces claras para Repositories, Services, Cache, Queue, Payment e Auth.
 
 ### 3. Adapters (Infraestrutura)
-- **Banco de Dados:** Implementação PostgreSQL com GORM (`internal/adapter/storage/postgres`).
-- **Cache:** Cliente Redis implementado (`internal/adapter/cache`).
+- **Banco de Dados:** Implementação NietzscheDB com GORM (`internal/adapter/storage/postgres`).
+- **Cache:** Cliente NietzscheDB implementado (`internal/adapter/cache`).
 - **Mensageria:** Cliente NATS implementado (`internal/adapter/queue`).
 - **HTTP Server:** API REST com Fiber, Middleware de Auth (JWT), Logging e Circuit Breaker.
 - **gRPC Server:** Servidor gRPC básico configurado.
@@ -73,4 +73,4 @@ Este documento resume o estado atual do desenvolvimento do sistema SIGEC-VE Ente
 ## 📊 Métricas de Código (Estimado)
 - **Arquitetura:** Hexagonal (Clean Architecture)
 - **Linguagem:** Go 1.22
-- **Dependências Chave:** Fiber, GORM, Zap, Vipor, NATS, Redis client, Gorilla WebSocket.
+- **Dependências Chave:** Fiber, GORM, Zap, Vipor, NATS, NietzscheDB client, Gorilla WebSocket.

@@ -6,27 +6,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/NietzscheDB/go-NietzscheDB/v9"
 )
 
-// TestRedis_BasicOperations tests basic Redis operations
-func TestRedis_BasicOperations(t *testing.T) {
+// TestNietzscheDB_BasicOperations tests basic NietzscheDB operations
+func TestNietzscheDB_BasicOperations(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	// Set and Get
 	t.Run("SetGet", func(t *testing.T) {
-		err := env.Redis.Set(ctx, "test:key", "test-value", time.Minute).Err()
+		err := env.NietzscheDB.Set(ctx, "test:key", "test-value", time.Minute).Err()
 		if err != nil {
 			t.Fatalf("Failed to set key: %v", err)
 		}
 
-		val, err := env.Redis.Get(ctx, "test:key").Result()
+		val, err := env.NietzscheDB.Get(ctx, "test:key").Result()
 		if err != nil {
 			t.Fatalf("Failed to get key: %v", err)
 		}
@@ -38,13 +38,13 @@ func TestRedis_BasicOperations(t *testing.T) {
 
 	// Set with expiration
 	t.Run("SetWithExpiration", func(t *testing.T) {
-		err := env.Redis.Set(ctx, "test:expiring", "value", 100*time.Millisecond).Err()
+		err := env.NietzscheDB.Set(ctx, "test:expiring", "value", 100*time.Millisecond).Err()
 		if err != nil {
 			t.Fatalf("Failed to set key: %v", err)
 		}
 
 		// Verify it exists
-		_, err = env.Redis.Get(ctx, "test:expiring").Result()
+		_, err = env.NietzscheDB.Get(ctx, "test:expiring").Result()
 		if err != nil {
 			t.Fatalf("Key should exist: %v", err)
 		}
@@ -53,32 +53,32 @@ func TestRedis_BasicOperations(t *testing.T) {
 		time.Sleep(150 * time.Millisecond)
 
 		// Verify it's gone
-		_, err = env.Redis.Get(ctx, "test:expiring").Result()
-		if err != redis.Nil {
+		_, err = env.NietzscheDB.Get(ctx, "test:expiring").Result()
+		if err != NietzscheDB.Nil {
 			t.Error("Key should have expired")
 		}
 	})
 
 	// Delete
 	t.Run("Delete", func(t *testing.T) {
-		env.Redis.Set(ctx, "test:delete", "value", time.Minute)
+		env.NietzscheDB.Set(ctx, "test:delete", "value", time.Minute)
 
-		err := env.Redis.Del(ctx, "test:delete").Err()
+		err := env.NietzscheDB.Del(ctx, "test:delete").Err()
 		if err != nil {
 			t.Fatalf("Failed to delete key: %v", err)
 		}
 
-		_, err = env.Redis.Get(ctx, "test:delete").Result()
-		if err != redis.Nil {
+		_, err = env.NietzscheDB.Get(ctx, "test:delete").Result()
+		if err != NietzscheDB.Nil {
 			t.Error("Key should have been deleted")
 		}
 	})
 
 	// Exists
 	t.Run("Exists", func(t *testing.T) {
-		env.Redis.Set(ctx, "test:exists", "value", time.Minute)
+		env.NietzscheDB.Set(ctx, "test:exists", "value", time.Minute)
 
-		exists, err := env.Redis.Exists(ctx, "test:exists").Result()
+		exists, err := env.NietzscheDB.Exists(ctx, "test:exists").Result()
 		if err != nil {
 			t.Fatalf("Failed to check exists: %v", err)
 		}
@@ -87,7 +87,7 @@ func TestRedis_BasicOperations(t *testing.T) {
 			t.Error("Key should exist")
 		}
 
-		exists, err = env.Redis.Exists(ctx, "test:nonexistent").Result()
+		exists, err = env.NietzscheDB.Exists(ctx, "test:nonexistent").Result()
 		if err != nil {
 			t.Fatalf("Failed to check exists: %v", err)
 		}
@@ -98,14 +98,14 @@ func TestRedis_BasicOperations(t *testing.T) {
 	})
 }
 
-// TestRedis_JSONOperations tests storing and retrieving JSON
-func TestRedis_JSONOperations(t *testing.T) {
+// TestNietzscheDB_JSONOperations tests storing and retrieving JSON
+func TestNietzscheDB_JSONOperations(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	type Device struct {
@@ -129,7 +129,7 @@ func TestRedis_JSONOperations(t *testing.T) {
 			t.Fatalf("Failed to marshal: %v", err)
 		}
 
-		err = env.Redis.Set(ctx, "device:CP001", data, time.Minute).Err()
+		err = env.NietzscheDB.Set(ctx, "device:CP001", data, time.Minute).Err()
 		if err != nil {
 			t.Fatalf("Failed to store JSON: %v", err)
 		}
@@ -137,7 +137,7 @@ func TestRedis_JSONOperations(t *testing.T) {
 
 	// Retrieve JSON
 	t.Run("RetrieveJSON", func(t *testing.T) {
-		data, err := env.Redis.Get(ctx, "device:CP001").Bytes()
+		data, err := env.NietzscheDB.Get(ctx, "device:CP001").Bytes()
 		if err != nil {
 			t.Fatalf("Failed to get JSON: %v", err)
 		}
@@ -153,19 +153,19 @@ func TestRedis_JSONOperations(t *testing.T) {
 	})
 }
 
-// TestRedis_HashOperations tests Redis hash operations
-func TestRedis_HashOperations(t *testing.T) {
+// TestNietzscheDB_HashOperations tests NietzscheDB hash operations
+func TestNietzscheDB_HashOperations(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	// HSet
 	t.Run("HSet", func(t *testing.T) {
-		err := env.Redis.HSet(ctx, "user:123", map[string]interface{}{
+		err := env.NietzscheDB.HSet(ctx, "user:123", map[string]interface{}{
 			"name":  "John Doe",
 			"email": "john@example.com",
 			"role":  "user",
@@ -178,7 +178,7 @@ func TestRedis_HashOperations(t *testing.T) {
 
 	// HGet
 	t.Run("HGet", func(t *testing.T) {
-		name, err := env.Redis.HGet(ctx, "user:123", "name").Result()
+		name, err := env.NietzscheDB.HGet(ctx, "user:123", "name").Result()
 		if err != nil {
 			t.Fatalf("Failed to HGet: %v", err)
 		}
@@ -190,7 +190,7 @@ func TestRedis_HashOperations(t *testing.T) {
 
 	// HGetAll
 	t.Run("HGetAll", func(t *testing.T) {
-		data, err := env.Redis.HGetAll(ctx, "user:123").Result()
+		data, err := env.NietzscheDB.HGetAll(ctx, "user:123").Result()
 		if err != nil {
 			t.Fatalf("Failed to HGetAll: %v", err)
 		}
@@ -206,9 +206,9 @@ func TestRedis_HashOperations(t *testing.T) {
 
 	// HIncrBy
 	t.Run("HIncrBy", func(t *testing.T) {
-		env.Redis.HSet(ctx, "stats:daily", "requests", 0)
+		env.NietzscheDB.HSet(ctx, "stats:daily", "requests", 0)
 
-		newVal, err := env.Redis.HIncrBy(ctx, "stats:daily", "requests", 1).Result()
+		newVal, err := env.NietzscheDB.HIncrBy(ctx, "stats:daily", "requests", 1).Result()
 		if err != nil {
 			t.Fatalf("Failed to HIncrBy: %v", err)
 		}
@@ -217,7 +217,7 @@ func TestRedis_HashOperations(t *testing.T) {
 			t.Errorf("Expected 1, got %d", newVal)
 		}
 
-		newVal, err = env.Redis.HIncrBy(ctx, "stats:daily", "requests", 5).Result()
+		newVal, err = env.NietzscheDB.HIncrBy(ctx, "stats:daily", "requests", 5).Result()
 		if err != nil {
 			t.Fatalf("Failed to HIncrBy: %v", err)
 		}
@@ -228,19 +228,19 @@ func TestRedis_HashOperations(t *testing.T) {
 	})
 }
 
-// TestRedis_ListOperations tests Redis list operations
-func TestRedis_ListOperations(t *testing.T) {
+// TestNietzscheDB_ListOperations tests NietzscheDB list operations
+func TestNietzscheDB_ListOperations(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	// LPush
 	t.Run("LPush", func(t *testing.T) {
-		err := env.Redis.LPush(ctx, "queue:events", "event1", "event2", "event3").Err()
+		err := env.NietzscheDB.LPush(ctx, "queue:events", "event1", "event2", "event3").Err()
 		if err != nil {
 			t.Fatalf("Failed to LPush: %v", err)
 		}
@@ -248,7 +248,7 @@ func TestRedis_ListOperations(t *testing.T) {
 
 	// LLen
 	t.Run("LLen", func(t *testing.T) {
-		length, err := env.Redis.LLen(ctx, "queue:events").Result()
+		length, err := env.NietzscheDB.LLen(ctx, "queue:events").Result()
 		if err != nil {
 			t.Fatalf("Failed to LLen: %v", err)
 		}
@@ -260,7 +260,7 @@ func TestRedis_ListOperations(t *testing.T) {
 
 	// RPop
 	t.Run("RPop", func(t *testing.T) {
-		val, err := env.Redis.RPop(ctx, "queue:events").Result()
+		val, err := env.NietzscheDB.RPop(ctx, "queue:events").Result()
 		if err != nil {
 			t.Fatalf("Failed to RPop: %v", err)
 		}
@@ -272,7 +272,7 @@ func TestRedis_ListOperations(t *testing.T) {
 
 	// LRange
 	t.Run("LRange", func(t *testing.T) {
-		vals, err := env.Redis.LRange(ctx, "queue:events", 0, -1).Result()
+		vals, err := env.NietzscheDB.LRange(ctx, "queue:events", 0, -1).Result()
 		if err != nil {
 			t.Fatalf("Failed to LRange: %v", err)
 		}
@@ -283,19 +283,19 @@ func TestRedis_ListOperations(t *testing.T) {
 	})
 }
 
-// TestRedis_SetOperations tests Redis set operations
-func TestRedis_SetOperations(t *testing.T) {
+// TestNietzscheDB_SetOperations tests NietzscheDB set operations
+func TestNietzscheDB_SetOperations(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	// SAdd
 	t.Run("SAdd", func(t *testing.T) {
-		err := env.Redis.SAdd(ctx, "online:users", "user1", "user2", "user3").Err()
+		err := env.NietzscheDB.SAdd(ctx, "online:users", "user1", "user2", "user3").Err()
 		if err != nil {
 			t.Fatalf("Failed to SAdd: %v", err)
 		}
@@ -303,7 +303,7 @@ func TestRedis_SetOperations(t *testing.T) {
 
 	// SMembers
 	t.Run("SMembers", func(t *testing.T) {
-		members, err := env.Redis.SMembers(ctx, "online:users").Result()
+		members, err := env.NietzscheDB.SMembers(ctx, "online:users").Result()
 		if err != nil {
 			t.Fatalf("Failed to SMembers: %v", err)
 		}
@@ -315,7 +315,7 @@ func TestRedis_SetOperations(t *testing.T) {
 
 	// SIsMember
 	t.Run("SIsMember", func(t *testing.T) {
-		isMember, err := env.Redis.SIsMember(ctx, "online:users", "user1").Result()
+		isMember, err := env.NietzscheDB.SIsMember(ctx, "online:users", "user1").Result()
 		if err != nil {
 			t.Fatalf("Failed to SIsMember: %v", err)
 		}
@@ -324,7 +324,7 @@ func TestRedis_SetOperations(t *testing.T) {
 			t.Error("user1 should be a member")
 		}
 
-		isMember, err = env.Redis.SIsMember(ctx, "online:users", "user999").Result()
+		isMember, err = env.NietzscheDB.SIsMember(ctx, "online:users", "user999").Result()
 		if err != nil {
 			t.Fatalf("Failed to SIsMember: %v", err)
 		}
@@ -336,31 +336,31 @@ func TestRedis_SetOperations(t *testing.T) {
 
 	// SRem
 	t.Run("SRem", func(t *testing.T) {
-		err := env.Redis.SRem(ctx, "online:users", "user2").Err()
+		err := env.NietzscheDB.SRem(ctx, "online:users", "user2").Err()
 		if err != nil {
 			t.Fatalf("Failed to SRem: %v", err)
 		}
 
-		isMember, _ := env.Redis.SIsMember(ctx, "online:users", "user2").Result()
+		isMember, _ := env.NietzscheDB.SIsMember(ctx, "online:users", "user2").Result()
 		if isMember {
 			t.Error("user2 should have been removed")
 		}
 	})
 }
 
-// TestRedis_PubSub tests Redis pub/sub
-func TestRedis_PubSub(t *testing.T) {
+// TestNietzscheDB_PubSub tests NietzscheDB pub/sub
+func TestNietzscheDB_PubSub(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	// Subscribe and publish
 	t.Run("PubSub", func(t *testing.T) {
-		pubsub := env.Redis.Subscribe(ctx, "test:channel")
+		pubsub := env.NietzscheDB.Subscribe(ctx, "test:channel")
 		defer pubsub.Close()
 
 		// Wait for subscription to be ready
@@ -372,7 +372,7 @@ func TestRedis_PubSub(t *testing.T) {
 		// Publish in goroutine
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			env.Redis.Publish(ctx, "test:channel", "test-message")
+			env.NietzscheDB.Publish(ctx, "test:channel", "test-message")
 		}()
 
 		// Receive message with timeout
@@ -388,14 +388,14 @@ func TestRedis_PubSub(t *testing.T) {
 	})
 }
 
-// TestRedis_Caching tests caching patterns
-func TestRedis_Caching(t *testing.T) {
+// TestNietzscheDB_Caching tests caching patterns
+func TestNietzscheDB_Caching(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	// Cache-aside pattern
@@ -403,20 +403,20 @@ func TestRedis_Caching(t *testing.T) {
 		key := "cache:device:CP001"
 
 		// Cache miss
-		_, err := env.Redis.Get(ctx, key).Result()
-		if err != redis.Nil {
+		_, err := env.NietzscheDB.Get(ctx, key).Result()
+		if err != NietzscheDB.Nil {
 			t.Error("Expected cache miss")
 		}
 
 		// Simulate fetching from DB and caching
 		data := `{"id":"CP001","vendor":"ABB"}`
-		err = env.Redis.Set(ctx, key, data, 5*time.Minute).Err()
+		err = env.NietzscheDB.Set(ctx, key, data, 5*time.Minute).Err()
 		if err != nil {
 			t.Fatalf("Failed to cache: %v", err)
 		}
 
 		// Cache hit
-		cached, err := env.Redis.Get(ctx, key).Result()
+		cached, err := env.NietzscheDB.Get(ctx, key).Result()
 		if err != nil {
 			t.Fatalf("Cache hit failed: %v", err)
 		}
@@ -432,27 +432,27 @@ func TestRedis_Caching(t *testing.T) {
 
 		// Update cache and DB together (simulated)
 		newBalance := "150.00"
-		err := env.Redis.Set(ctx, key, newBalance, 5*time.Minute).Err()
+		err := env.NietzscheDB.Set(ctx, key, newBalance, 5*time.Minute).Err()
 		if err != nil {
 			t.Fatalf("Failed to update cache: %v", err)
 		}
 
 		// Verify cache is updated
-		cached, _ := env.Redis.Get(ctx, key).Result()
+		cached, _ := env.NietzscheDB.Get(ctx, key).Result()
 		if cached != newBalance {
 			t.Errorf("Expected '%s', got '%s'", newBalance, cached)
 		}
 	})
 }
 
-// TestRedis_RateLimiting tests rate limiting pattern
-func TestRedis_RateLimiting(t *testing.T) {
+// TestNietzscheDB_RateLimiting tests rate limiting pattern
+func TestNietzscheDB_RateLimiting(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	if env == nil || env.Redis == nil {
-		t.Skip("Redis not available")
+	if env == nil || env.NietzscheDB == nil {
+		t.Skip("NietzscheDB not available")
 	}
 
-	FlushRedis(t, env.Redis)
+	FlushNietzscheDB(t, env.NietzscheDB)
 	ctx := context.Background()
 
 	// Sliding window rate limiter
@@ -463,14 +463,14 @@ func TestRedis_RateLimiting(t *testing.T) {
 
 		// Simulate requests
 		for i := 0; i < 7; i++ {
-			count, err := env.Redis.Incr(ctx, key).Result()
+			count, err := env.NietzscheDB.Incr(ctx, key).Result()
 			if err != nil {
 				t.Fatalf("Failed to increment: %v", err)
 			}
 
 			// Set expiration on first request
 			if count == 1 {
-				env.Redis.Expire(ctx, key, window)
+				env.NietzscheDB.Expire(ctx, key, window)
 			}
 
 			if count <= limit {
@@ -483,7 +483,7 @@ func TestRedis_RateLimiting(t *testing.T) {
 		}
 
 		// Verify count
-		count, _ := env.Redis.Get(ctx, key).Int64()
+		count, _ := env.NietzscheDB.Get(ctx, key).Int64()
 		if count != 7 {
 			t.Errorf("Expected count 7, got %d", count)
 		}

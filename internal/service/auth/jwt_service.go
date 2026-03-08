@@ -141,7 +141,7 @@ func (s *JWTService) ValidateToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-// RevokeToken stores the token ID in the Redis cache with a TTL, effectively
+// RevokeToken stores the token ID in the cache with a TTL, effectively
 // blacklisting it until it would have naturally expired.
 func (s *JWTService) RevokeToken(ctx context.Context, tokenID string) error {
 	key := fmt.Sprintf("revoked_token:%s", tokenID)
@@ -170,7 +170,7 @@ func (s *JWTService) RevokeToken(ctx context.Context, tokenID string) error {
 }
 
 // IsTokenRevoked checks whether a token ID has been revoked by looking it up
-// in the Redis cache.
+// in the cache.
 func (s *JWTService) IsTokenRevoked(ctx context.Context, tokenID string) bool {
 	key := fmt.Sprintf("revoked_token:%s", tokenID)
 

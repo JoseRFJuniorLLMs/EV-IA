@@ -82,7 +82,7 @@ jobs:
               -e APP_GRPC_PORT=50053 \
               -e APP_OCPP_PORT=9001 \
               -e DATABASE_URL="postgres://postgres:Debian23%40@localhost:5432/ev-db?sslmode=disable" \
-              -e REDIS_URL="redis://localhost:6379/0" \
+              -e NietzscheDB_URL="NietzscheDB://localhost:6379/0" \
               -e NATS_URL="" \
               -e JWT_SECRET="'"${{ secrets.JWT_SECRET }}"'" \
               -e GEMINI_API_KEY="'"${{ secrets.GEMINI_API_KEY }}"'" \

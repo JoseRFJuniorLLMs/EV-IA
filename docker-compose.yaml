@@ -23,7 +23,7 @@ services:
     environment:
       - APP_ENVIRONMENT=development
       - DATABASE_URL=postgres://admin:SecurePassword123@postgres:5432/sigec_dev?sslmode=disable
-      - REDIS_URL=redis://:RedisPassword123@redis:6379/0
+      - NietzscheDB_URL=NietzscheDB://:NietzscheDBPassword123@NietzscheDB:6379/0
       - NATS_URL=nats://nats:4222
       - JWT_SECRET=dev-secret-change-in-production
       - GEMINI_API_KEY=${GEMINI_API_KEY}
@@ -32,7 +32,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      NietzscheDB:
         condition: service_healthy
       nats:
         condition: service_started
@@ -64,12 +64,12 @@ services:
     environment:
       - APP_ENVIRONMENT=development
       - DATABASE_URL=postgres://admin:SecurePassword123@postgres:5432/sigec_dev?sslmode=disable
-      - REDIS_URL=redis://:RedisPassword123@redis:6379/0
+      - NietzscheDB_URL=NietzscheDB://:NietzscheDBPassword123@NietzscheDB:6379/0
       - NATS_URL=nats://nats:4222
       - LOG_LEVEL=debug
     depends_on:
       - postgres
-      - redis
+      - NietzscheDB
       - nats
     volumes:
       - ./configs:/app/configs:ro
@@ -79,7 +79,7 @@ services:
     restart: unless-stopped
 
   # ============================================
-  # PostgreSQL Database
+  # NietzscheDB Database
   # ============================================
   postgres:
     image: postgres:16-alpine
@@ -92,9 +92,9 @@ services:
       - POSTGRES_PASSWORD=SecurePassword123
       - POSTGRES_DB=sigec_dev
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=pt_BR.UTF-8 --lc-ctype=pt_BR.UTF-8
-      - PGDATA=/var/lib/postgresql/data/pgdata
+      - PGDATA=/var/lib/NietzscheDB/data/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/NietzscheDB/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - sigec-network
@@ -106,22 +106,22 @@ services:
       retries: 5
 
   # ============================================
-  # Redis Cache
+  # NietzscheDB Cache
   # ============================================
-  redis:
-    image: redis:7-alpine
-    container_name: sigec-redis
-    hostname: redis
+  NietzscheDB:
+    image: NietzscheDB:7-alpine
+    container_name: sigec-NietzscheDB
+    hostname: NietzscheDB
     ports:
       - "6379:6379"
-    command: redis-server --requirepass RedisPassword123 --appendonly yes
+    command: NietzscheDB-server --requirepass NietzscheDBPassword123 --appendonly yes
     volumes:
-      - redis_data:/data
+      - NietzscheDB_data:/data
     networks:
       - sigec-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      test: [ "CMD", "NietzscheDB-cli", "--raw", "incr", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -205,7 +205,7 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_INSTALL_PLUGINS=NietzscheDB-datasource
       - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:
       - grafana_data:/var/lib/grafana
@@ -279,7 +279,7 @@ services:
 volumes:
   postgres_data:
     driver: local
-  redis_data:
+  NietzscheDB_data:
     driver: local
   nats_data:
     driver: local

@@ -5,25 +5,22 @@ go 1.24.0
 replace nietzsche-sdk => ../NietzscheDB/sdks/go
 
 require (
-	nietzsche-sdk v0.0.0
 	github.com/gofiber/fiber/v2 v2.52.0
 	github.com/gofiber/websocket/v2 v2.2.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/hashicorp/vault/api v1.22.0
-	github.com/lib/pq v1.11.2
 	github.com/nats-io/nats.go v1.33.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/redis/go-redis/v9 v9.7.3
+	github.com/NietzscheDB/go-NietzscheDB/v9 v9.7.3
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
 	github.com/sony/gobreaker v0.5.0
 	github.com/spf13/viper v1.18.2
 	github.com/stripe/stripe-go/v76 v76.25.0
 	github.com/testcontainers/testcontainers-go v0.40.0
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
-	github.com/testcontainers/testcontainers-go/modules/redis v0.40.0
+	github.com/testcontainers/testcontainers-go/modules/NietzscheDB v0.40.0
 	github.com/valyala/fasthttp v1.51.0
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
@@ -31,9 +28,8 @@ require (
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.46.0
 	google.golang.org/grpc v1.79.1
-	gorm.io/driver/postgres v1.5.6
-	gorm.io/gorm v1.25.7
 	nhooyr.io/websocket v1.8.10
+	nietzsche-sdk v0.0.0
 )
 
 require (
@@ -73,12 +69,6 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-7 // indirect
-	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
-	github.com/jackc/pgx/v5 v5.5.4 // indirect
-	github.com/jackc/puddle/v2 v2.2.1 // indirect
-	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
@@ -135,7 +125,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
 	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.12.0 // indirect

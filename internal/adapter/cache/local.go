@@ -18,7 +18,7 @@ type cacheEntry struct {
 }
 
 // LocalCache implements the ports.Cache interface using an in-memory map.
-// Used as a fallback when Redis is unavailable.
+// Primary cache implementation for device caching and JWT blacklist.
 type LocalCache struct {
 	data   map[string]cacheEntry
 	mu     sync.RWMutex

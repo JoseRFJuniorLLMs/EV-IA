@@ -151,6 +151,6 @@ ENTRYPOINT ["/app/sigec-server"]
 # Run locally:
 #   docker run -p 8080:8080 -p 9000:9000 \
 #     -e DATABASE_URL=postgres://... \
-#     -e REDIS_URL=redis://... \
+#     -e NietzscheDB_URL=NietzscheDB://... \
 #     sigec-ve:dev
 # ============================================

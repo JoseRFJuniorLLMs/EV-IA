@@ -78,7 +78,7 @@ Baseado na **EVA-Web** (stack comprovada em producao):
          │  └─────────────────┘   │
          │                         │
          │  ┌─────┐ ┌─────┐      │
-         │  │ PG  │ │Redis│      │
+         │  │ PG  │ │NietzscheDB│      │
          │  └─────┘ └─────┘      │
          │                         │
          │  ┌─────────────────┐   │

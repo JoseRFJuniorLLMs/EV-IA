@@ -2,13 +2,13 @@ package health
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+
+	"github.com/seu-repo/sigec-ve/internal/ports"
 )
 
 // Status represents the health status
@@ -49,10 +49,15 @@ type ReadyResponse struct {
 // Checker defines a health check function
 type Checker func(ctx context.Context) CheckResult
 
+// DatabasePinger defines an interface for checking database connectivity
+type DatabasePinger interface {
+	Ping(ctx context.Context) error
+}
+
 // Service handles health checks
 type Service struct {
-	db        *sql.DB
-	redis     *redis.Client
+	dbPinger  DatabasePinger
+	cache     ports.Cache
 	natsURL   string
 	startTime time.Time
 	version   string
@@ -63,17 +68,17 @@ type Service struct {
 
 // Config holds health service configuration
 type Config struct {
-	Version string
-	DB      *sql.DB
-	Redis   *redis.Client
-	NatsURL string
+	Version  string
+	DBPinger DatabasePinger // NietzscheDB or any database that implements Ping
+	Cache    ports.Cache
+	NatsURL  string
 }
 
 // NewService creates a new health service
 func NewService(config *Config, log *zap.Logger) *Service {
 	s := &Service{
-		db:        config.DB,
-		redis:     config.Redis,
+		dbPinger:  config.DBPinger,
+		cache:     config.Cache,
 		natsURL:   config.NatsURL,
 		startTime: time.Now(),
 		version:   config.Version,
@@ -82,11 +87,11 @@ func NewService(config *Config, log *zap.Logger) *Service {
 	}
 
 	// Register default checkers
-	if config.DB != nil {
+	if config.DBPinger != nil {
 		s.RegisterChecker("database", s.checkDatabase)
 	}
-	if config.Redis != nil {
-		s.RegisterChecker("redis", s.checkRedis)
+	if config.Cache != nil {
+		s.RegisterChecker("cache", s.checkCache)
 	}
 	if config.NatsURL != "" {
 		s.RegisterChecker("nats", s.checkNATS)
@@ -166,7 +171,7 @@ func (s *Service) Ready(ctx context.Context) *ReadyResponse {
 	}
 }
 
-// checkDatabase checks the database connection
+// checkDatabase checks the database connection (NietzscheDB)
 func (s *Service) checkDatabase(ctx context.Context) CheckResult {
 	start := time.Now()
 	result := CheckResult{
@@ -174,14 +179,14 @@ func (s *Service) checkDatabase(ctx context.Context) CheckResult {
 		Timestamp: time.Now(),
 	}
 
-	if s.db == nil {
+	if s.dbPinger == nil {
 		result.Status = StatusUnhealthy
 		result.Message = "database not configured"
 		result.Duration = time.Since(start)
 		return result
 	}
 
-	err := s.db.PingContext(ctx)
+	err := s.dbPinger.Ping(ctx)
 	result.Duration = time.Since(start)
 
 	if err != nil {
@@ -196,28 +201,28 @@ func (s *Service) checkDatabase(ctx context.Context) CheckResult {
 	return result
 }
 
-// checkRedis checks the Redis connection
-func (s *Service) checkRedis(ctx context.Context) CheckResult {
+// checkCache checks the cache health via the ports.Cache interface
+func (s *Service) checkCache(ctx context.Context) CheckResult {
 	start := time.Now()
 	result := CheckResult{
-		Name:      "redis",
+		Name:      "cache",
 		Timestamp: time.Now(),
 	}
 
-	if s.redis == nil {
+	if s.cache == nil {
 		result.Status = StatusUnhealthy
-		result.Message = "redis not configured"
+		result.Message = "cache not configured"
 		result.Duration = time.Since(start)
 		return result
 	}
 
-	err := s.redis.Ping(ctx).Err()
+	err := s.cache.Ping()
 	result.Duration = time.Since(start)
 
 	if err != nil {
 		result.Status = StatusUnhealthy
 		result.Message = fmt.Sprintf("ping failed: %v", err)
-		s.log.Warn("Redis health check failed", zap.Error(err))
+		s.log.Warn("Cache health check failed", zap.Error(err))
 	} else {
 		result.Status = StatusHealthy
 		result.Message = "connection ok"

@@ -68,7 +68,7 @@ sigec-ve-enterprise/
 │   │   │       └── 001_initial_schema.sql
 │   │   │
 │   │   ├── cache/
-│   │   │   ├── redis.go               # Cache distribuído
+│   │   │   ├── NietzscheDB.go               # Cache distribuído
 │   │   │   └── local.go               # Cache local (Ristretto)
 │   │   │
 │   │   ├── queue/
@@ -215,7 +215,7 @@ sigec-ve-enterprise/
 │       └── modules/
 │           ├── gke/
 │           ├── rds/
-│           └── redis/
+│           └── NietzscheDB/
 │
 ├── scripts/
 │   ├── setup-dev.sh
@@ -1215,13 +1215,13 @@ services:
       - "50051:50051" # gRPC
     environment:
       - DATABASE_URL=postgres://admin:password@postgres:5432/sigec
-      - REDIS_URL=redis://redis:6379
+      - NietzscheDB_URL=NietzscheDB://NietzscheDB:6379
       - NATS_URL=nats://nats:4222
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
     depends_on:
       - postgres
-      - redis
+      - NietzscheDB
       - nats
       - jaeger
   
@@ -1231,11 +1231,11 @@ services:
       dockerfile: deployments/docker/Dockerfile.worker
     environment:
       - DATABASE_URL=postgres://admin:password@postgres:5432/sigec
-      - REDIS_URL=redis://redis:6379
+      - NietzscheDB_URL=NietzscheDB://NietzscheDB:6379
       - NATS_URL=nats://nats:4222
     depends_on:
       - postgres
-      - redis
+      - NietzscheDB
       - nats
   
   postgres:
@@ -1245,16 +1245,16 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=sigec
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/NietzscheDB/data
     ports:
       - "5432:5432"
   
-  redis:
-    image: redis:7-alpine
+  NietzscheDB:
+    image: NietzscheDB:7-alpine
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - NietzscheDB_data:/data
   
   nats:
     image: nats:2.10-alpine
@@ -1293,7 +1293,7 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
+  NietzscheDB_data:
   prometheus_data:
   grafana_data:
 ```

@@ -3,8 +3,8 @@
 ## Pré-requisitos
 
 O servidor já tem configurado:
-- PostgreSQL 16 rodando
-- Redis 7.0 rodando
+- NietzscheDB 16 rodando
+- NietzscheDB 7.0 rodando
 - NATS JetStream rodando
 - Arquivo `.env` configurado
 
@@ -346,17 +346,17 @@ curl http://localhost:8080/api/v1/admin/ocpp/connections \
 
 ### Erro: "Failed to connect to database"
 ```bash
-# Verificar se PostgreSQL está rodando
+# Verificar se NietzscheDB está rodando
 psql -h localhost -U admin -c "SELECT 1"
 
 # Verificar variável DATABASE_URL no .env
 echo $DATABASE_URL
 ```
 
-### Erro: "Failed to connect to Redis"
+### Erro: "Failed to connect to NietzscheDB"
 ```bash
-# Verificar se Redis está rodando
-redis-cli ping
+# Verificar se NietzscheDB está rodando
+NietzscheDB-cli ping
 # Resposta: PONG
 ```
 

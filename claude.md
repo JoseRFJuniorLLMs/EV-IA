@@ -30,13 +30,13 @@ Gerenciar estacoes de carregamento de VE em larga escala com interface de voz ("
 | **Go** | 1.22 | Linguagem principal |
 | **Fiber** | v2.52.0 | Framework HTTP (similar Express.js) |
 | **gRPC** | - | Comunicacao RPC alta performance |
-| **GORM** | v1.25.7 | ORM para PostgreSQL |
+| **GORM** | v1.25.7 | ORM para NietzscheDB |
 
 ### Banco de Dados e Cache
 | Tecnologia | Versao | Proposito |
 |------------|--------|-----------|
-| **PostgreSQL** | 16 | Banco relacional principal |
-| **Redis** | 7 | Cache distribuido e sessoes |
+| **NietzscheDB** | 16 | Banco relacional principal |
+| **NietzscheDB** | 7 | Cache distribuido e sessoes |
 | **NATS JetStream** | - | Message broker e event streaming |
 
 ### Inteligencia Artificial e Voz
@@ -104,7 +104,7 @@ Gerenciar estacoes de carregamento de VE em larga escala com interface de voz ("
 ┌────────────────────────▼────────────────────────────────────┐
 │             Infrastructure / Adapter Layer                   │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │PostgreSQL│  │  Redis   │  │   NATS   │  │  Gemini  │    │
+│  │NietzscheDB│  │  NietzscheDB   │  │   NATS   │  │  Gemini  │    │
 │  │  (GORM)  │  │  Cache   │  │  Queue   │  │ Live API │    │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
 └─────────────────────────────────────────────────────────────┘
@@ -139,7 +139,7 @@ sigec-ve-enterprise/
 ├── internal/                      # Codigo privado
 │   ├── adapter/                   # Adapters (Infraestrutura)
 │   │   ├── ai/                    # IA: anthropic, gemini, openai
-│   │   ├── cache/                 # Redis, local
+│   │   ├── cache/                 # NietzscheDB, local
 │   │   ├── external/              # notification, payment
 │   │   ├── grpc/                  # servidor gRPC
 │   │   ├── http/fiber/            # Servidor HTTP Fiber
@@ -147,7 +147,7 @@ sigec-ve-enterprise/
 │   │   │   └── middleware/        # Auth, CORS, RateLimit, CircuitBreaker
 │   │   ├── ocpp/v201/             # OCPP 2.0.1 WebSocket
 │   │   ├── queue/                 # NATS, RabbitMQ
-│   │   ├── storage/postgres/      # PostgreSQL + GORM
+│   │   ├── storage/postgres/      # NietzscheDB + GORM
 │   │   ├── vault/                 # Secrets
 │   │   └── websocket/             # Real-time updates
 │   │
@@ -264,7 +264,7 @@ type VoiceResponse struct {
 - `ValidateToken(token)` -> *User
 
 ### DeviceService
-- `GetDevice(id)` -> *ChargePoint (com cache Redis)
+- `GetDevice(id)` -> *ChargePoint (com cache NietzscheDB)
 - `ListDevices(filter)` -> []ChargePoint
 - `UpdateStatus(id, status)` -> error (invalida cache, publica evento)
 - `GetNearby(lat, lon, radius)` -> []ChargePoint
@@ -380,8 +380,8 @@ database:
   max_open_conns: 100
   auto_migrate: true
 
-redis:
-  url: redis://:password@redis:6379/0
+NietzscheDB:
+  url: NietzscheDB://:password@NietzscheDB:6379/0
   pool_size: 100
 
 nats:
@@ -417,7 +417,7 @@ payment:
 JWT_SECRET
 GEMINI_API_KEY
 DATABASE_URL
-REDIS_URL
+NietzscheDB_URL
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 SENDGRID_API_KEY
@@ -453,7 +453,7 @@ type AuthService struct {
 ### 2. Dependency Injection
 ```go
 // main.go
-authService := auth.NewService(userRepo, redisCache, cfg.JWT.Secret, logger)
+authService := auth.NewService(userRepo, NietzscheDBCache, cfg.JWT.Secret, logger)
 authHandler := handlers.NewAuthHandler(authService, logger)
 ```
 
@@ -511,7 +511,7 @@ protected := v1.Group("", middleware.AuthRequired(authService))
 
 ### Desenvolvimento
 ```bash
-make dev              # Docker Compose: API + DB + Redis + NATS + Jaeger
+make dev              # Docker Compose: API + DB + NietzscheDB + NATS + Jaeger
 make run              # Rodar servidor local
 make build            # Compilar binario
 make test             # Rodar testes
@@ -540,8 +540,8 @@ helm install sigec deployments/kubernetes/helm/sigec-ve
 ### Implementado
 - [x] Arquitetura Hexagonal completa
 - [x] Core models (User, ChargePoint, Transaction, Voice)
-- [x] PostgreSQL adapter com GORM
-- [x] Redis cache (ATIVO - com TTL e invalidacao)
+- [x] NietzscheDB adapter com GORM
+- [x] NietzscheDB cache (ATIVO - com TTL e invalidacao)
 - [x] NATS messaging (ATIVO - publicacao de eventos)
 - [x] JWT authentication
 - [x] REST API com Fiber
@@ -593,8 +593,8 @@ helm install sigec deployments/kubernetes/helm/sigec-ve
 1. Logger (Zap)
 2. Config (Viper)
 3. OpenTelemetry (Jaeger)
-4. PostgreSQL (GORM + migrations)
-5. Redis Cache
+4. NietzscheDB (GORM + migrations)
+5. NietzscheDB Cache
 6. NATS Queue
 7. Repositories
 8. Services

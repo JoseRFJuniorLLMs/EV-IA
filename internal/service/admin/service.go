@@ -230,7 +230,7 @@ func (s *Service) GetUsageStats(ctx context.Context, startDate, endDate time.Tim
 func (s *Service) GetUsers(ctx context.Context, filter ports.UserFilter, limit, offset int) ([]domain.User, int, error) {
 	// TODO: UserRepository only exposes FindByID and FindByEmail.
 	// To support listing/filtering users, add a FindAll(ctx, filter, limit, offset) method
-	// to ports.UserRepository and implement it in the PostgreSQL adapter.
+	// to ports.UserRepository and implement it in the NietzscheDB adapter.
 	// Until then, this endpoint cannot return user lists.
 	s.log.Warn("GetUsers called but UserRepository.FindAll is not implemented")
 	return []domain.User{}, 0, nil

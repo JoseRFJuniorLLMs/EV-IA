@@ -45,12 +45,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      redis:
-        image: redis:7-alpine
+      NietzscheDB:
+        image: NietzscheDB:7-alpine
         ports:
           - 6379:6379
         options: >-
-          --health-cmd "redis-cli ping"
+          --health-cmd "NietzscheDB-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -77,7 +77,7 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
         env:
           DATABASE_URL: postgres://sigec:sigec_test@localhost:5432/sigec_test?sslmode=disable
-          REDIS_URL: redis://localhost:6379
+          NietzscheDB_URL: NietzscheDB://localhost:6379
           NATS_URL: nats://localhost:4222
 
       - name: Upload coverage

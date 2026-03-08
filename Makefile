@@ -118,7 +118,7 @@ docker-run: ## Roda a imagem Docker localmente
 	@echo "🐳 Running Docker container..."
 	docker run -p 8080:8080 -p 9000:9000 \
 		-e DATABASE_URL=postgres://admin:password@host.docker.internal:5432/sigec \
-		-e REDIS_URL=redis://host.docker.internal:6379/0 \
+		-e NietzscheDB_URL=NietzscheDB://host.docker.internal:6379/0 \
 		$(IMAGE):latest
 
 # ============================================
@@ -238,7 +238,7 @@ db-seed: ## Popula banco com dados de exemplo
 	$(GO) run ./scripts/seed/main.go
 	@echo "✅ Seeding concluído"
 
-db-console: ## Abre console do PostgreSQL
+db-console: ## Abre console do NietzscheDB
 	docker-compose exec postgres psql -U admin -d sigec_dev
 
 # ============================================

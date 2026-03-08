@@ -49,8 +49,8 @@ stringData:
   # Database
   DATABASE_URL: "postgres://admin:CHANGE_ME@postgres-primary.database.svc.cluster.local:5432/sigec_prod?sslmode=require"
   
-  # Redis
-  REDIS_URL: "redis://:CHANGE_ME@redis-master.cache.svc.cluster.local:6379/0"
+  # NietzscheDB
+  NietzscheDB_URL: "NietzscheDB://:CHANGE_ME@NietzscheDB-master.cache.svc.cluster.local:6379/0"
   
   # NATS
   NATS_URL: "nats://nats.messaging.svc.cluster.local:4222"
@@ -170,11 +170,11 @@ spec:
             secretKeyRef:
               name: sigec-ve-secrets
               key: DATABASE_URL
-        - name: REDIS_URL
+        - name: NietzscheDB_URL
           valueFrom:
             secretKeyRef:
               name: sigec-ve-secrets
-              key: REDIS_URL
+              key: NietzscheDB_URL
         - name: NATS_URL
           valueFrom:
             secretKeyRef:
@@ -512,7 +512,7 @@ spec:
     ports:
     - protocol: UDP
       port: 53
-  # Allow PostgreSQL
+  # Allow NietzscheDB
   - to:
     - namespaceSelector:
         matchLabels:
@@ -520,7 +520,7 @@ spec:
     ports:
     - protocol: TCP
       port: 5432
-  # Allow Redis
+  # Allow NietzscheDB
   - to:
     - namespaceSelector:
         matchLabels:

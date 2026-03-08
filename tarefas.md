@@ -101,7 +101,7 @@
 - [ ] **Implementar cache local** - `internal/adapter/cache/local.go`
   - Atual: Arquivo com 2 linhas (vazio)
   - Necessario: Implementar cache in-memory com TTL
-  - Usar como fallback do Redis
+  - Usar como fallback do NietzscheDB
 
 ### RBAC/OAuth2
 - [ ] **Implementar jwt_service.go** - `internal/service/auth/jwt_service.go`

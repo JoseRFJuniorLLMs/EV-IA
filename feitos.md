@@ -188,7 +188,7 @@ firmware.update.failed         → Falha na atualização
 ## Próximos Passos
 
 1. [x] Implementar handlers HTTP/REST para os novos endpoints
-2. [x] Criar repositório V2G (PostgreSQL)
+2. [x] Criar repositório V2G (NietzscheDB)
 3. [x] Integrar com sistema de pagamentos para compensação V2G
 4. [x] Adicionar testes unitários
 5. [x] Integrar com API CCEE para preços reais da rede
@@ -332,7 +332,7 @@ firmware.update.failed         → Falha na atualização
 | Mensagens OCPP implementadas | 25+ |
 | Interfaces de serviço | 8 |
 | Endpoints REST | 20+ |
-| Tabelas PostgreSQL | 8 |
+| Tabelas NietzscheDB | 8 |
 | Testes unitários | 50+ |
 
 ---
@@ -340,8 +340,8 @@ firmware.update.failed         → Falha na atualização
 ## Configuração do Ambiente
 
 O servidor de produção (`eva-ia.org`) já possui:
-- PostgreSQL 16 configurado
-- Redis 7.0 configurado
+- NietzscheDB 16 configurado
+- NietzscheDB 7.0 configurado
 - NATS JetStream configurado
 - Arquivo `.env` com todas as variáveis
 
